@@ -1,48 +1,40 @@
 #!/bin/bash
-set -euo pipefail
+set -e
 
-GITHUB_OWNER="${github_owner}"
-GITHUB_REPO="${github_repo}"
-GITHUB_TOKEN="${github_token}"
-
-RUNNER_NAME="$(hostname)"
-RUNNER_VERSION="2.314.1"
-RUNNER_DIR="/runner"
-
+echo "Installing dependencies..."
 apt-get update -y
-apt-get install -y curl jq git docker.io
+apt-get install -y curl jq docker.io
 
-mkdir -p $RUNNER_DIR
-cd $RUNNER_DIR
+systemctl enable docker
+systemctl start docker
 
+RUNNER_VERSION="2.314.1"
+mkdir -p /actions-runner
+cd /actions-runner
+
+echo "Downloading GitHub Actions Runner..."
 curl -o actions-runner.tar.gz -L \
 https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz
 
 tar xzf actions-runner.tar.gz
 
+echo "Requesting GitHub registration token..."
 REG_TOKEN=$(curl -s -X POST \
-  -H "Authorization: token ${GITHUB_TOKEN}" \
-  -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runners/registration-token \
+  -H "Authorization: token ${github_token}" \
+  https://api.github.com/repos/${github_owner}/${github_repo}/actions/runners/registration-token \
   | jq -r .token)
 
-./config.sh --url https://github.com/${GITHUB_OWNER}/${GITHUB_REPO} \
- --token ${REG_TOKEN} \
- --name ${RUNNER_NAME} \
- --unattended \
- --replace
+echo "Configuring runner..."
+./config.sh --url https://github.com/${github_owner}/${github_repo} \
+  --token $REG_TOKEN \
+  --name gce-runner-$(hostname) \
+  --labels gce,self-hosted \
+  --unattended \
+  --replace
 
-./run.sh &
+echo "Starting runner..."
+./run.sh
 
-RUNNER_PID=$!
-wait $RUNNER_PID
-
-REMOVE_TOKEN=$(curl -s -X POST \
-  -H "Authorization: token ${GITHUB_TOKEN}" \
-  -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runners/remove-token \
-  | jq -r .token)
-
-./config.sh remove --token ${REMOVE_TOKEN}
-
+echo "Job finished — shutting down VM"
 shutdown -h now
+
