@@ -14,6 +14,12 @@ variable "environment" {
   type        = string
 }
 
+variable "controller_token" {
+  description = "Shared secret token used by GitHub to call the Cloud Run controller"
+  type        = string
+  sensitive   = true
+}
+
 variable "controller_image" {
   description = "Docker image for Cloud Run controller"
   type        = string
