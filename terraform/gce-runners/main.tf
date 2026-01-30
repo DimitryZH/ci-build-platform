@@ -19,7 +19,7 @@ resource "google_compute_instance" "runner" {
   }
 
   metadata = {
-    startup-script = templatefile("${path.module}/startup-script.sh", {
+    startup-script = templatefile("${path.root}/../runner/startup-script.sh", {
       github_token = var.github_token
       github_org   = var.github_org
       github_repo  = var.github_repo

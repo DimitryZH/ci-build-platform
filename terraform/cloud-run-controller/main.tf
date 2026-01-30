@@ -23,9 +23,14 @@ resource "google_cloud_run_service" "runner_controller" {
           value = var.github_org
         }
 
-        env {
+         env {
           name  = "TF_VAR_github_repo"
           value = var.github_repo
+        }
+
+        env {
+          name  = "GITHUB_CONTROLLER_TOKEN"
+          value = var.controller_token
         }
       }
 
