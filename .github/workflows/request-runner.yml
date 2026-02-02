@@ -1,0 +1,19 @@
+name: Request Ephemeral Runner
+
+on:
+   workflow_dispatch:
+   push:
+      branches:
+         - main
+
+jobs:
+   request-runner:
+      runs-on: ubuntu-latest
+
+      steps:
+         - name: Request GCE runner from Cloud Run controller
+           run: |
+              curl -X POST \
+                -H "X-Controller-Token: ${{ secrets.CLOUD_RUN_TOKEN }}" \
+                -H "Content-Type: application/json" \
+                ${{ secrets.CLOUD_RUN_CONTROLLER_URL }}/run
