@@ -22,6 +22,38 @@ The platform is designed to mirror real-world **Platform Engineering** and **Ent
 - Full observability with log-based metrics and alerts
 - Horizontally scalable: multiple ephemeral runners can be created in parallel
 
+## implementation Highlights
+
+This project builds and publishes immutable container images to Docker Hub and consumed by SRE Platform as immutable artifacts.
+
+Images are pushed to Docker Hub via CI Build Platform and consumed by SRE Platform as immutable artifacts.
+
+The full platform consists of three main components:
+
+[CI Build Platform (this repo)](https://github.com/DimitryZH/ci-build-platform)
+
+[SRE Platform](https://github.com/DimitryZH/ecommerce-observability-platform)
+
+[Container Platform](https://github.com/DimitryZH/container-platform) ([Docker Hub Repository](https://hub.docker.com/u/dmitryzhuravlev))
+
+
+```mermaid
+flowchart LR
+    CI[CI Build Platform] -->|Build and Tag Images| DockerHub[Container Platform]
+    DockerHub -->|Provide Images to Deploy| SRE[SRE Platform on GKE]
+
+    subgraph Platforms Ecosystem
+        CI
+        DockerHub
+        SRE
+    end
+
+    style CI fill:#E5F2FF,stroke:#1E70BF,stroke-width:2px
+    style DockerHub fill:#FFF2E5,stroke:#BF5E1E,stroke-width:2px
+    style SRE fill:#E5FFE5,stroke:#1EBF2F,stroke-width:2px
+```
+
+
 ---
 
 ## Architecture
@@ -447,6 +479,7 @@ This project is suitable for organizations that need:
 - **Secure build environments** with tight network and IAM controls.  
 - **Custom build dependencies** that do not fit well into shared SaaS runners.  
 - **Cost-controlled CI execution** by running compute only when needed.  
+
 
 ---
 

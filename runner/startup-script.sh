@@ -25,27 +25,27 @@ systemctl enable docker
 usermod -aG docker ubuntu
 
 # ---- DOWNLOAD RUNNER ----
-mkdir -p ${RUNNER_DIR}
-cd ${RUNNER_DIR}
+mkdir -p $RUNNER_DIR
+cd $RUNNER_DIR
 
 curl -L -o actions-runner.tar.gz \
-  https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz
+  https://github.com/actions/runner/releases/download/v$RUNNER_VERSION/actions-runner-linux-x64-$RUNNER_VERSION.tar.gz
 
 tar xzf actions-runner.tar.gz
-chown -R ubuntu:ubuntu ${RUNNER_DIR}
+chown -R ubuntu:ubuntu $RUNNER_DIR
 
 # ---- GET REGISTRATION TOKEN ----
 REG_TOKEN=$(curl -s -X POST \
-  -H "Authorization: token ${GITHUB_TOKEN}" \
+  -H "Authorization: token $GITHUB_TOKEN" \
   -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/${GITHUB_ORG}/${GITHUB_REPO}/actions/runners/registration-token \
+  https://api.github.com/repos/$GITHUB_ORG/$GITHUB_REPO/actions/runners/registration-token \
   | jq -r .token)
 
 # ---- CONFIGURE RUNNER ----
 sudo -u ubuntu ./config.sh \
-  --url https://github.com/${GITHUB_ORG}/${GITHUB_REPO} \
-  --token ${REG_TOKEN} \
-  --name ${RUNNER_NAME} \
+  --url https://github.com/$GITHUB_ORG/$GITHUB_REPO \
+  --token $REG_TOKEN \
+  --name $RUNNER_NAME \
   --labels gce,ephemeral \
   --unattended \
   --ephemeral
@@ -55,4 +55,3 @@ sudo -u ubuntu ./run.sh
 
 # ---- SELF-DESTRUCT ----
 shutdown -h now
-

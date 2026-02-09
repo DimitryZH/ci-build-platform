@@ -50,7 +50,7 @@ resource "google_monitoring_alert_policy" "ci_errors_alert" {
     display_name = "CI Runner Errors"
 
     condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/ci_runner_errors\""
+      filter          = "metric.type=\"logging.googleapis.com/user/ci_runner_errors\" AND resource.type=\"gce_instance\""
       duration        = "60s"
       comparison      = "COMPARISON_GT"
       threshold_value = 0
@@ -66,7 +66,7 @@ resource "google_monitoring_alert_policy" "ci_errors_alert" {
     display_name = "Cloud Run Controller Errors"
 
     condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/ci_controller_errors\""
+      filter          = "metric.type=\"logging.googleapis.com/user/ci_controller_errors\" AND resource.type=\"cloud_run_revision\""
       duration        = "60s"
       comparison      = "COMPARISON_GT"
       threshold_value = 0

@@ -1,19 +1,22 @@
-FROM hashicorp/terraform:1.7.5
+# -------- Terraform stage --------
+FROM hashicorp/terraform:1.7.5 AS terraform
 
-RUN apk add --no-cache python3 py3-pip bash curl
+# -------- Runtime stage --------
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy terraform binary only
+COPY --from=terraform /bin/terraform /usr/local/bin/terraform
 
 WORKDIR /workspace
 
-# Install controller dependencies
-COPY cloudrun-controller/app/requirements.txt ./requirements.txt
-RUN pip3 install -r requirements.txt
+COPY cloudrun-controller/app/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy controller application code
-COPY cloudrun-controller/app /workspace/app
+COPY cloudrun-controller/app ./app
+COPY terraform ./terraform
 
-# Copy Terraform configuration (root terraform directory)
-COPY terraform /workspace/terraform
-
-ENV PYTHONUNBUFFERED=1
-
-CMD ["python3", "/workspace/app/app.py"]
+CMD ["python", "/workspace/app/app.py"]
