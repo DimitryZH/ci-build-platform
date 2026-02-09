@@ -19,11 +19,13 @@ module "cloud_run_controller" {
   region      = var.region
   environment = var.environment
 
-  controller_image      = var.controller_image
-  service_account_email = var.controller_service_account_email
+  controller_image              = var.controller_image
+  service_account_email         = var.controller_service_account_email
+  runner_service_account_email  = var.runner_service_account_email
 
   github_org       = var.github_org
   github_repo      = var.github_repo
+  github_token     = var.github_token
   controller_token = var.controller_token
 }
 

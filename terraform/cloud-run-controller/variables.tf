@@ -14,6 +14,11 @@ variable "environment" {
   type        = string
 }
 
+variable "runner_service_account_email" {
+  description = "Service account email used by GCE runners (passed through to TF in controller container)"
+  type        = string
+}
+
 variable "controller_token" {
   description = "Shared secret token used by GitHub to call the Cloud Run controller"
   type        = string
@@ -28,6 +33,12 @@ variable "controller_image" {
 variable "service_account_email" {
   description = "Service account used by Cloud Run"
   type        = string
+}
+
+variable "github_token" {
+  description = "GitHub token used by runners to register with GitHub Actions (passed through to TF in controller container)"
+  type        = string
+  sensitive   = true
 }
 
 variable "github_org" {
