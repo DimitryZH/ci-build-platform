@@ -165,6 +165,10 @@ flowchart TB
 ```text
 ci-build-platform/
 ├── README.md
+├── docs/
+│   ├── deployment_guide.md
+│   ├── troubleshooting.md
+│   └── assets/    
 ├── application/
 │   ├── Dockerfile
 │   └── src/
@@ -181,7 +185,6 @@ ci-build-platform/
     ├── backend.tf
     ├── providers.tf
     ├── variables.tf
-    ├── terraform.tfvars        # user-specific, not committed
     ├── cloud-run-controller/
     │   ├── main.tf
     │   ├── variables.tf
@@ -199,10 +202,12 @@ ci-build-platform/
 Key paths:
 
 - Root documentation: [`README.md`](README.md)
+- Detailed deployment guide: [`docs/deployment_guide.md`](docs/deployment_guide.md)
+- Troubleshooting runbook: [`docs/troubleshooting.md`](docs/troubleshooting.md)
 - Sample application: [`application/`](application/)
 - Cloud Run controller service: [`cloudrun-controller/`](cloudrun-controller/)
 - Runner bootstrap script: [`runner/startup-script.sh`](runner/startup-script.sh)
-- Terraform infrastructure: [`terraform/`](terraform/)
+- Terraform infrastructure: [`terraform/`](terraform/main.tf)
 
 ---
 
@@ -297,38 +302,38 @@ The platform produces and manages the following key artifacts:
 At a high level, standing up this platform involves:
 
 1. **Provisioning core infrastructure with Terraform**  
-   - Configure backend and providers under [`terraform/`](terraform/main.tf:209).  
+   - Configure backend and providers under [`terraform/`](terraform/main.tf).  
    - Create service accounts and IAM bindings for the runner and controller.  
    - Apply modules for:
-     - GCE runners: [`terraform/gce-runners/main.tf`](terraform/gce-runners/main.tf:1)  
-     - Cloud Run controller: [`terraform/cloud-run-controller/main.tf`](terraform/cloud-run-controller/main.tf:1)  
-     - Monitoring: [`terraform/monitoring/main.tf`](terraform/monitoring/main.tf:1)
+     - GCE runners: [`terraform/gce-runners/main.tf`](terraform/gce-runners/main.tf)  
+     - Cloud Run controller: [`terraform/cloud-run-controller/main.tf`](terraform/cloud-run-controller/main.tf)  
+     - Monitoring: [`terraform/monitoring/main.tf`](terraform/monitoring/main.tf)
 
 2. **Building and pushing the Cloud Run controller image**  
-   - Build from [`cloudrun-controller/Dockerfile`](cloudrun-controller/Dockerfile:1).  
+   - Build from [`cloudrun-controller/Dockerfile`](cloudrun-controller/Dockerfile).  
    - Push to your registry (e.g. Docker Hub).  
-   - Point `controller_image` in [`terraform/terraform.tfvars`](terraform/terraform.tfvars:1) at that image and re-apply Terraform.
+   - Point `controller_image` in [`terraform/terraform.tfvars`](terraform/terraform.tfvars) at that image and re-apply Terraform.
 
 3. **Configuring GitHub secrets and workflows**  
    - Add secrets for:
      - Cloud Run URL and controller token.  
      - Docker Hub credentials.  
    - Use the provided workflows:  
-     - Request runner: [`.github/workflows/request-runner.yml`](.github/workflows/request-runner.yml:1)  
-     - Build & push: [`.github/workflows/build-and-push.yml`](.github/workflows/build-and-push.yml:1)
+     - Request runner: [`.github/workflows/request-runner.yml`](.github/workflows/request-runner.yml)  
+     - Build & push: [`.github/workflows/build-and-push.yml`](.github/workflows/build-and-push.yml)
 
 4. **Running the CI flow**  
    - Trigger **Request Ephemeral Runner** to provision a GCE VM.  
-   - The VM runs [`runner/startup-script.sh`](runner/startup-script.sh:1) to register an ephemeral self-hosted runner.  
-   - The **Build and Push Docker Image** workflow runs on that runner, builds from [`application/Dockerfile`](application/Dockerfile:1), and pushes to Docker Hub.
+   - The VM runs [`runner/startup-script.sh`](runner/startup-script.sh) to register an ephemeral self-hosted runner.  
+   - The **Build and Push Docker Image** workflow runs on that runner, builds from [`application/Dockerfile`](application/Dockerfile), and pushes to Docker Hub.
 
 5. **Observability & operations**  
-   - Use the monitoring module under [`terraform/monitoring/`](terraform/monitoring/main.tf:1) to track runner and controller errors.  
+   - Use the monitoring module under [`terraform/monitoring/`](terraform/monitoring/main.tf) to track runner and controller errors.  
    - Use Cloud Logging & Monitoring to inspect infrastructure and workflow health.
 
 ### 3. Detailed deployment guide
 
-For a **step-by-step, production-ready deployment walkthrough** (including:
+For a **step-by-step, production-ready deployment walkthrough** including:
 
 - Exact `terraform.tfvars` structure and which values are sensitive.  
 - Full IAM role set for `ci-runner-sa` and `ci-controller-sa`.  
@@ -338,7 +343,20 @@ For a **step-by-step, production-ready deployment walkthrough** (including:
 
 see the dedicated guide:
 
-- [`docs/deployment_guide.md`](docs/deployment_guide.md:1)
+- [`docs/deployment_guide.md`](docs/deployment_guide.md)
+
+### 4. Troubleshooting guide
+
+For a **hands-on troubleshooting runbook** based on real issues encountered while bringing this platform up including:
+
+- Common Cloud Run / Terraform / IAM failure modes.  
+- Template and file path problems for [`runner/startup-script.sh`](runner/startup-script.sh).  
+- GitHub PAT and runner registration errors.  
+- Ephemeral runner vs. persistent GCE instance behavior.
+
+see the troubleshooting guide:
+
+- [`docs/troubleshooting.md`](docs/troubleshooting.md)
 
 ---
 
@@ -460,8 +478,7 @@ That solution focuses on:
 This project intentionally implements a **leaner alternative**:
 
 - Direct Compute Engine runners (no MIGs, no GKE dependency).  
-- Simple, transparent infrastructure you can fully inspect and modify.  
-- Easier learning path for CI platform concepts on GCP.  
+- Simple, transparent infrastructure you can fully inspect and modify.    
 - High visibility into the entire runner lifecycle and control plane.
 
 Both approaches are valid. This repository emphasizes a **small, production-style CI platform** without black-box modules, making it easier to customize, extend, and reason about.
@@ -477,17 +494,11 @@ This project is suitable for organizations that need:
 - **Custom build dependencies** that do not fit well into shared SaaS runners.  
 - **Cost-controlled CI execution** by running compute only when needed.  
 
-
----
-
-## Author
-
-- **Name:** Dmitry Zhuravlev  
-- **Role:** DevOps Engineer  
-
 ---
 
 ## License
 
 This project is licensed under the **MIT License**.
 
+---
+Contributions are welcome! Please open issues or pull requests for improvements, bug fixes, or additional documentation.
