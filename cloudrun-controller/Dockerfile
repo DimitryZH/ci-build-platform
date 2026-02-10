@@ -18,5 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY cloudrun-controller/app ./app
 COPY terraform ./terraform
+COPY runner ./runner
 
 CMD ["python", "/workspace/app/app.py"]
