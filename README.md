@@ -292,56 +292,53 @@ The platform produces and manages the following key artifacts:
 - A GitHub repository where workflows will be configured.
 - A container registry (Docker Hub or GCP Artifact Registry).
 
-### 2. Configure Terraform
+### 2. High-level setup flow
 
-1. Copy or create [`terraform/terraform.tfvars`](terraform/terraform.tfvars) and populate it with values for your environment (project ID, region, GitHub settings, registry, etc.).
-2. Initialize Terraform:
+At a high level, standing up this platform involves:
 
-   ```bash
-   terraform -chdir=terraform init
-   ```
+1. **Provisioning core infrastructure with Terraform**  
+   - Configure backend and providers under [`terraform/`](terraform/main.tf:209).  
+   - Create service accounts and IAM bindings for the runner and controller.  
+   - Apply modules for:
+     - GCE runners: [`terraform/gce-runners/main.tf`](terraform/gce-runners/main.tf:1)  
+     - Cloud Run controller: [`terraform/cloud-run-controller/main.tf`](terraform/cloud-run-controller/main.tf:1)  
+     - Monitoring: [`terraform/monitoring/main.tf`](terraform/monitoring/main.tf:1)
 
-3. Review the plan and apply:
+2. **Building and pushing the Cloud Run controller image**  
+   - Build from [`cloudrun-controller/Dockerfile`](cloudrun-controller/Dockerfile:1).  
+   - Push to your registry (e.g. Docker Hub).  
+   - Point `controller_image` in [`terraform/terraform.tfvars`](terraform/terraform.tfvars:1) at that image and re-apply Terraform.
 
-   ```bash
-   terraform -chdir=terraform plan
-   terraform -chdir=terraform apply
-   ```
+3. **Configuring GitHub secrets and workflows**  
+   - Add secrets for:
+     - Cloud Run URL and controller token.  
+     - Docker Hub credentials.  
+   - Use the provided workflows:  
+     - Request runner: [`.github/workflows/request-runner.yml`](.github/workflows/request-runner.yml:1)  
+     - Build & push: [`.github/workflows/build-and-push.yml`](.github/workflows/build-and-push.yml:1)
 
-This will provision:
+4. **Running the CI flow**  
+   - Trigger **Request Ephemeral Runner** to provision a GCE VM.  
+   - The VM runs [`runner/startup-script.sh`](runner/startup-script.sh:1) to register an ephemeral self-hosted runner.  
+   - The **Build and Push Docker Image** workflow runs on that runner, builds from [`application/Dockerfile`](application/Dockerfile:1), and pushes to Docker Hub.
 
-- The Cloud Run controller.  
-- Supporting IAM roles and service accounts.  
-- Monitoring resources (metrics, alerts).  
-- Any base infrastructure required by the runner module.
+5. **Observability & operations**  
+   - Use the monitoring module under [`terraform/monitoring/`](terraform/monitoring/main.tf:1) to track runner and controller errors.  
+   - Use Cloud Logging & Monitoring to inspect infrastructure and workflow health.
 
-### 3. Build and Deploy Controller Image
+### 3. Detailed deployment guide
 
-Build the controller image from [`cloudrun-controller/Dockerfile`](cloudrun-controller/Dockerfile) and push it to your registry. Then update Terraform variables (if necessary) to point the Cloud Run service to that image and re-apply Terraform.
+For a **step-by-step, production-ready deployment walkthrough** (including:
 
-### 4. Configure GitHub Workflows
+- Exact `terraform.tfvars` structure and which values are sensitive.  
+- Full IAM role set for `ci-runner-sa` and `ci-controller-sa`.  
+- How to create and validate the GitHub PAT used as `github_token`.  
+- How to wire `TF_VAR_*` env vars and GitHub Secrets.  
+- How to verify ephemeral runner lifecycle end-to-end.
 
-In your GitHub repository, define workflows that:
+see the dedicated guide:
 
-1. **Request an Ephemeral Runner**  
-   - Triggered on `push`, `pull_request`, or manual dispatch.  
-   - Sends an authenticated HTTP request to the Cloud Run controller URL.  
-   - Passes metadata such as repository, labels, and job identifiers.
-
-2. **Run the CI Job on the Ephemeral Runner**  
-   - Targets self-hosted runners with specific labels.  
-   - Builds the Docker image from [`application/Dockerfile`](application/Dockerfile).  
-   - Pushes the image to Docker Hub or your chosen registry.  
-   - Optionally runs tests and static analysis.
-
-3. **Cleanup (Implicit)**  
-   - The runner VM deregisters from GitHub and self-terminates after the job completes, enforced by the logic in [`runner/startup-script.sh`](runner/startup-script.sh).
-
-### 5. Observe and Operate
-
-- Monitor logs and metrics via Cloud Logging & Monitoring dashboards and alerts.  
-- Inspect Terraform state and apply logs to understand infrastructure changes.  
-- Tune runner sizes, timeouts, and labels via variables in the Terraform modules.
+- [`docs/deployment_guide.md`](docs/deployment_guide.md:1)
 
 ---
 
@@ -493,5 +490,4 @@ This project is suitable for organizations that need:
 ## License
 
 This project is licensed under the **MIT License**.
-
 
