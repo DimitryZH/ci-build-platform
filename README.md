@@ -22,40 +22,6 @@ The platform is designed to mirror real-world **Platform Engineering** and **Ent
 - Full observability with log-based metrics and alerts
 - Horizontally scalable: multiple ephemeral runners can be created in parallel
 
-## implementation Highlights
-
-This project builds and publishes immutable container images to Docker Hub and consumed by SRE Platform as immutable artifacts.
-
-Images are pushed to Docker Hub via CI Build Platform and consumed by SRE Platform as immutable artifacts.
-
-The full platform consists of three main components:
-
-[CI Build Platform (this repo)](https://github.com/DimitryZH/ci-build-platform)
-
-[SRE Platform](https://github.com/DimitryZH/ecommerce-observability-platform)
-
-[Container Platform](https://github.com/DimitryZH/container-platform) ([Docker Hub Repository](https://hub.docker.com/u/dmitryzhuravlev))
-
-
-```mermaid
-flowchart LR
-    CI[CI Build Platform] -->|Build and Tag Images| DockerHub[Container Platform]
-    DockerHub -->|Provide Images to Deploy| SRE[SRE Platform on GKE]
-
-    subgraph Platforms Ecosystem
-        CI
-        DockerHub
-        SRE
-    end
-
-    style CI fill:#E5F2FF,stroke:#1E70BF,stroke-width:2px
-    style DockerHub fill:#FFF2E5,stroke:#BF5E1E,stroke-width:2px
-    style SRE fill:#E5FFE5,stroke:#1EBF2F,stroke-width:2px
-```
-
-
----
-
 ## Architecture
 
 ### Core Components
@@ -493,6 +459,36 @@ This project is suitable for organizations that need:
 - **Secure build environments** with tight network and IAM controls.  
 - **Custom build dependencies** that do not fit well into shared SaaS runners.  
 - **Cost-controlled CI execution** by running compute only when needed.  
+
+---
+
+## Implementation Highlights
+
+This CI platform is not just a standalone demo; it is already wired into a broader, production-style ecosystem of repositories and platforms:
+
+- **CI Build Platform (this repo)** – provisions ephemeral GCE-based GitHub Actions runners via Terraform and Cloud Run, and builds/publishes immutable container images to Docker Hub.
+- **SRE Platform** – consumes those images as immutable artifacts and runs them on GKE (see the separate SRE / observability project in my portfolio).
+- **Container Platform** – provides curated base images and runtimes published under the `dmitryzhuravlev` Docker Hub namespace, which are built and versioned by this CI pipeline.
+
+In practice, a typical flow looks like:
+
+```mermaid
+flowchart LR
+    CI[CI Build Platform] -->|Build and Tag Images| DockerHub[Container Platform]
+    DockerHub -->|Provide Images to Deploy| SRE[SRE Platform on GKE]
+
+    subgraph Platforms Ecosystem
+        CI
+        DockerHub
+        SRE
+    end
+
+    style CI fill:#E5F2FF,stroke:#1E70BF,stroke-width:2px
+    style DockerHub fill:#FFF2E5,stroke:#BF5E1E,stroke-width:2px
+    style SRE fill:#E5FFE5,stroke:#1EBF2F,stroke-width:2px
+```
+
+This demonstrates that the design, IAM model, and GitHub integration described above have been validated against real projects and real workflows, not just theoretical examples.
 
 ---
 
