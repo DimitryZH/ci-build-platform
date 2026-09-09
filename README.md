@@ -62,7 +62,7 @@ flowchart TB
     end
 
     subgraph Controller["Cloud Run Controller (Control Plane)"]
-        CR[Receives Webhook / Triggers Terraform]
+        CR[Receives authenticated workflow request / Triggers Terraform]
     end
 
     subgraph Runner["Compute Engine Ephemeral Runner"]
@@ -81,6 +81,14 @@ flowchart TB
     VM -->|Logs & metrics| M
     VM -->|Self-destruct| CR
 ```
+
+## GitHub API Integration
+
+This platform integrates with GitHub Actions and the GitHub REST API to provision ephemeral GCE-based self-hosted runners. During startup, each runner obtains a short-lived registration token through:
+
+`POST /repos/{owner}/{repo}/actions/runners/registration-token`
+
+The runner registers with GitHub, executes the CI workload, and terminates afterward. See [`docs/github-integration.md`](docs/github-integration.md) for the detailed integration description.
 
 ### Architecture Components
 
@@ -331,7 +339,7 @@ see the troubleshooting guide:
 The GitHub Actions workflows (typically under `.github/workflows/`) are expected to:
 
 1. **Request Ephemeral Runner**
-   - Triggered on code push or PR events.  
+   - Triggered manually with `workflow_dispatch` and on pushes to `main`.
    - Calls the Cloud Run controller to create a new GCE runner.
 
 2. **Execute CI Job on Ephemeral Runner**
