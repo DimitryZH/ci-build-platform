@@ -71,6 +71,8 @@ These properties are based on the current repository implementation and deployme
 
 Successful GitHub Actions runs demonstrate the end-to-end workflow from runner request through execution on a self-hosted ephemeral runner.
 
+See [github-integration-validation.md](github-integration-validation.md) for verified historical workflow-run evidence.
+
 The relevant validation path is:
 
 1. The `Request Ephemeral Runner` workflow calls the Cloud Run controller.
