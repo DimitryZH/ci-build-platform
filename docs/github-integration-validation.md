@@ -8,12 +8,12 @@ This document records historical evidence for the implemented GitHub Actions / G
 
 The implemented flow is:
 
-GitHub Actions request workflow -> authenticated Cloud Run controller request -> GCE ephemeral runner provisioning -> GitHub registration token request -> self-hosted runner registration -> CI workload execution -> runner shutdown.
+GitHub Actions request workflow -> Cloud Run controller request with `X-Controller-Token` -> GCE runner provisioning -> GitHub registration token request -> self-hosted runner registration -> CI workload execution -> runner shutdown.
 
 ```mermaid
 flowchart LR
-    A[GitHub Actions request workflow] --> B[Authenticated Cloud Run controller request]
-    B --> C[GCE ephemeral runner provisioning]
+    A[GitHub Actions request workflow] --> B[Cloud Run request with X-Controller-Token]
+    B --> C[GCE runner provisioning]
     C --> D[GitHub registration token request]
     D --> E[Self-hosted runner registration]
     E --> F[CI workload execution]

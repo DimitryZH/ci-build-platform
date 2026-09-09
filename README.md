@@ -22,8 +22,8 @@ The project demonstrates practical Platform Engineering and CI concepts, includi
 ### Core Components
 
 - **GitHub Actions** — initiates runner provisioning and executes CI workloads.
-- **Cloud Run controller** — receives an authenticated workflow request and invokes Terraform.
-- **Terraform** — provisions the temporary GCE runner infrastructure.
+- **Cloud Run controller** — validates the workflow's `X-Controller-Token` header and invokes Terraform.
+- **Terraform** — provisions and manages the GCE runner instance.
 - **Google Compute Engine (GCE)** — hosts the ephemeral self-hosted runner.
 - **GitHub REST API** — provides the short-lived registration token used by the runner.
 - **Docker** — packages the sample application as a container image.
@@ -32,7 +32,7 @@ The project demonstrates practical Platform Engineering and CI concepts, includi
 ### High-Level Flow
 
 1. An operator manually starts the **Request Ephemeral Runner** workflow with `workflow_dispatch`.
-2. The workflow sends an authenticated request to the Cloud Run controller.
+2. The workflow sends the Cloud Run controller a request with the shared `X-Controller-Token` header.
 3. The controller invokes Terraform to provision the GCE runner.
 4. During startup, the runner requests a short-lived GitHub registration token.
 5. The runner registers with GitHub as an ephemeral self-hosted runner.
@@ -43,9 +43,9 @@ The project demonstrates practical Platform Engineering and CI concepts, includi
 ```mermaid
 flowchart TD
     A[Manual workflow_dispatch] --> B[Request Ephemeral Runner]
-    B --> C[Authenticated Cloud Run Controller]
+    B --> C[Cloud Run request with X-Controller-Token]
     C --> D[Terraform]
-    D --> E[GCE Ephemeral Runner]
+    D --> E[GCE VM with Ephemeral Runner]
     E --> F[GitHub Runner Registration]
     F --> G[Build and Push Docker Image]
     G --> H[Runner VM Shutdown]
@@ -54,40 +54,25 @@ flowchart TD
 ### Detailed Flow
 
 ```mermaid
-flowchart TB
-    subgraph GitHub["GitHub"]
-        Request[Request Ephemeral Runner workflow]
-        API[GitHub REST API]
-        Build[Build and Push Docker Image workflow]
-    end
+sequenceDiagram
+    participant GH as GitHub
+    participant CR as Cloud Run Controller
+    participant TF as Terraform
+    participant VM as GCE VM / Ephemeral Runner
+    participant API as GitHub REST API
 
-    subgraph Controller["Cloud Run Controller"]
-        CR[Receives authenticated workflow request]
-    end
-
-    subgraph Provisioning["Provisioning"]
-        TF[Terraform]
-    end
-
-    subgraph Runner["Compute Engine Ephemeral Runner"]
-        VM[GCE VM]
-        Agent[GitHub Actions Runner]
-        Job[CI Build Job]
-    end
-
-    Request -->|Manual workflow_dispatch| CR
-    CR -->|Invoke Terraform| TF
-    TF -->|Provision VM| VM
-    VM --> Agent
-    Agent -->|Request registration token| API
-    API -->|Short-lived token| Agent
-    Agent -->|Register as self-hosted / gce / ephemeral| GitHubReady[Runner available to GitHub]
-    Request -->|On successful completion| Build
-    Build -->|runs-on: self-hosted, gce, ephemeral| GitHubReady
-    GitHubReady --> Job
-    Job -->|Build and push image| Registry[Container Registry]
-    Job -->|Runner process exits| Shutdown[VM shutdown]
+    GH->>CR: 1. Send request with X-Controller-Token
+    CR->>TF: 2. Invoke runner provisioning
+    TF->>VM: 3. Provision and start the GCE VM
+    VM->>API: 4. Request a short-lived registration token
+    API-->>VM: 5. Return the registration token
+    VM-->>GH: 6. Register as self-hosted, gce, ephemeral
+    GH->>GH: 7. Trigger build workflow on request completion
+    GH->>VM: 8. If request succeeded, assign CI job to ephemeral runner
+    VM-->>VM: 9. Runner exits and the VM shuts down
 ```
+
+**Note:** Runner registration and request-workflow completion may overlap in time. The build workflow is triggered after the request workflow completes, and the build job runs only after a matching `self-hosted`, `gce`, `ephemeral` runner becomes available.
 
 ## GitHub API Integration
 
@@ -119,6 +104,8 @@ The current implementation:
 - executes the assigned CI workload;
 - shuts down the VM after the runner process exits.
 
+The GitHub runner registration is ephemeral. The GCE instance remains a Terraform-managed resource and may remain in a stopped state after shutdown.
+
 ### 2. Cloud Run Controller
 
 The controller application lives under [`cloudrun-controller/`](cloudrun-controller/).
@@ -126,9 +113,11 @@ The controller application lives under [`cloudrun-controller/`](cloudrun-control
 Its role is to:
 
 - expose the HTTP endpoint called by the request workflow;
-- validate the controller credential supplied by the workflow;
+- validate the shared `X-Controller-Token` header supplied by the workflow;
 - invoke Terraform for runner provisioning;
 - return a structured HTTP response to the caller.
+
+This validation is performed by the controller application; it is not Cloud Run IAM caller authentication.
 
 ### 3. GitHub Actions Workflows
 
@@ -241,7 +230,7 @@ For detailed deployment instructions, see [`docs/deployment_guide.md`](docs/depl
 The request workflow:
 
 - is triggered manually with `workflow_dispatch`;
-- calls the Cloud Run controller using an authenticated request;
+- calls the Cloud Run controller with the shared `X-Controller-Token` header;
 - requests provisioning of the temporary GCE runner.
 
 Automatic push-based provisioning is intentionally disabled because the demo GCP infrastructure is not kept running continuously.
@@ -259,7 +248,7 @@ The build workflow:
 
 ### Cleanup
 
-The runner is configured as ephemeral, and the VM shutdown path is initiated after the runner process exits.
+The runner is configured as ephemeral, and the VM shutdown path is initiated after the runner process exits. The Terraform-managed GCE instance resource may remain in a stopped state after shutdown.
 
 ## Validation
 
@@ -283,7 +272,7 @@ The repository demonstrates several security-oriented design choices:
 - ephemeral self-hosted runners;
 - controller and runner responsibilities separated across different service accounts;
 - sensitive credentials kept outside committed source code;
-- authenticated access to the Cloud Run controller;
+- application-level validation of the shared `X-Controller-Token` header by the Cloud Run controller;
 - temporary runner lifecycle rather than a permanently shared build host.
 
 Exact IAM configuration and credential setup are documented in [`docs/deployment_guide.md`](docs/deployment_guide.md).

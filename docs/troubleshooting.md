@@ -32,7 +32,7 @@ Each issue is structured with:
 
 ### Root Cause
 
-- The controller Flask app in [`cloudrun-controller/app/app.py`](cloudrun-controller/app/app.py:1) authenticates using a shared secret:
+- The controller Flask app in [`cloudrun-controller/app/app.py`](cloudrun-controller/app/app.py:1) validates an application-level shared secret:
 
   ```python
   GITHUB_TOKEN = os.environ.get("GITHUB_CONTROLLER_TOKEN")
@@ -45,6 +45,7 @@ Each issue is structured with:
   ```
 
 - `GITHUB_CONTROLLER_TOKEN` is set from `var.controller_token` in [`terraform/cloud-run-controller/main.tf`](terraform/cloud-run-controller/main.tf:39), while the workflow sends `X-Controller-Token` from the GitHub secret `CLOUD_RUN_TOKEN`.
+- This is application-level shared-secret validation, not Cloud Run IAM caller authentication.
 - Initially, these two values did **not** match, so every `/run` call failed and Terraform inside the controller never ran. No GCE runner VM was created; thus no runner existed to take the build job.
 
 ### Resolution
@@ -92,7 +93,7 @@ The Flask app returns HTTP 500 with:
 
 ### Root Cause
 
-- Locally, root variables (e.g. `controller_image`, `controller_service_account_email`, `github_token`, `controller_token`) were provided via [`terraform/terraform.tfvars`](terraform/terraform.tfvars:237) and `TF_VAR_*` env vars.
+- Locally, non-sensitive root variables (for example, `controller_image` and `controller_service_account_email`) were provided via [`terraform/terraform.tfvars`](terraform/terraform.tfvars:237), while `github_token` and `controller_token` were provided through `TF_VAR_*` environment variables.
 - Inside the controller container (`/workspace/terraform`), Terraform was executed by [`cloudrun-controller/app/app.py`](cloudrun-controller/app/app.py:16) **without** those variable values, so it prompted for input and then failed.
 
 ### Resolution
@@ -285,16 +286,6 @@ After this, Terraform inside the controller could read/update Cloud Run services
 - For fine-grained PATs, ensure both **Actions: Read and write** and **Administration: Read and write** permissions are granted for self-hosted runners.
 - Store PATs in a password manager; pass via `TF_VAR_github_token`, never in committed files.
 
-> Curl output showing 401 registration-token response:
-
- ![curl output showing 401 registration-token response](assets/curl_401.png)
-
-
-> Curl output showing successfu registration-token response:
-
- ![curl output showing successful registration-token response](assets/curl_success.png)
-
-
 > GitHub Actions Runners settings page showing ci-runner-dev with labels self-hosted, gce, and ephemeral in the active runners list, confirming successful runner registration after PAT validation
 
 ![runner registration after PAT validation](assets/ephemeral_runner_appeared.png)
@@ -330,11 +321,6 @@ After this, Terraform inside the controller could read/update Cloud Run services
   - The GitHub runner itself is ephemeral and visible only during job execution.  
   - The VM usually ends in a stopped/terminated state between runs.
 - If true VM-level ephemerality is required, design a pattern where Terraform (or the controller) creates and destroys instances per job instead of reusing a single named instance.
-
->  GCE VM list showing `ci-runner-dev` terminated 
-
-![`ci-runner-dev` terminated](assets/gce_terminated.png)
-
 
 > While no runner is listed in GitHub after a completed job.
 ![ephemeral runner disappeared](assets/ephemeral_runner_disappeared.png)

@@ -47,6 +47,8 @@ The deployment guide describes the relevant configuration:
 - `CLOUD_RUN_CONTROLLER_URL` is stored as a GitHub Actions secret and points the workflow to the Cloud Run controller endpoint.
 - Docker registry credentials are also stored as GitHub Actions secrets for the build workflow.
 
+The request workflow sends `X-Controller-Token`, and the controller application compares it with `GITHUB_CONTROLLER_TOKEN`. This is application-level shared-secret validation; it is not Cloud Run IAM caller authentication.
+
 See [`deployment_guide.md`](deployment_guide.md) for the deployment steps and secret configuration details.
 
 No real token values are stored or documented here.
@@ -59,7 +61,8 @@ The existing implementation uses the following security-relevant properties:
 - The build workflow targets self-hosted runners labeled `gce` and `ephemeral`.
 - One CI workload is intended to execute on each temporary runner.
 - The runner startup script shuts down the VM after the runner process exits.
-- No long-lived shared runner VM remains available for additional GitHub Actions jobs after job completion.
+- No active shared runner remains available for additional GitHub Actions jobs after job completion.
+- The Terraform-managed GCE instance resource may remain after shutdown, typically in a stopped state; the `--ephemeral` behavior applies to the GitHub runner registration rather than deleting the VM resource.
 - GitHub credentials and controller credentials are stored outside source code.
 - The deployment model separates the runner service account from the controller service account.
 - GCP IAM roles are assigned to those service accounts for their separate platform responsibilities.

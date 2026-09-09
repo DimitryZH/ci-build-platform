@@ -260,7 +260,7 @@ notification_channels = []
 Sensitive variables are **not** stored in `terraform.tfvars`. They are provided via environment variables when running Terraform:
 
 - [`variable "github_token"`](terraform/variables.tf:44) – GitHub PAT used by the runner VM to register with GitHub Actions.
-- [`variable "controller_token"`](terraform/variables.tf:55) – shared secret used by GitHub to authenticate to the Cloud Run controller.
+- [`variable "controller_token"`](terraform/variables.tf:55) – shared secret used by the controller application to validate the `X-Controller-Token` request header.
 
 Provide them as `TF_VAR_*` when running Terraform locally:
 
@@ -287,8 +287,8 @@ terraform -chdir=terraform apply
 Notes:
 
 - `github_token` is injected into the runner startup via the GCE module [`terraform/gce-runners/main.tf`](terraform/gce-runners/main.tf) and [`runner/startup-script.sh`](runner/startup-script.sh:37) so the VM can request a short-lived registration token from the GitHub API.
-- `controller_token` is exposed to Cloud Run as `GITHUB_CONTROLLER_TOKEN` (via [`terraform/cloud-run-controller/main.tf`](terraform/cloud-run-controller/main.tf)) and must match the `CLOUD_RUN_TOKEN` GitHub secret.
-  - Do **not** store either token in `terraform.tfvars` or in the repo; keep them in a password manager and pass via env.
+- `controller_token` is provided to Terraform through `TF_VAR_controller_token`, exposed to the controller as `GITHUB_CONTROLLER_TOKEN` (via [`terraform/cloud-run-controller/main.tf`](terraform/cloud-run-controller/main.tf)), and must match the `CLOUD_RUN_TOKEN` GitHub secret.
+  - Do **not** store either token in `terraform.tfvars` or in the repo; keep them in a password manager and pass via environment variables.
 
 ### 5.1 Create the GitHub token for runners
 
@@ -374,7 +374,7 @@ Open GitHub for `DimitryZH/ci-build-platform` → **Settings → Secrets and var
 
 2. `CLOUD_RUN_TOKEN`
 
-   - Value: **exactly the same** as `controller_token` in `terraform/terraform.tfvars`.
+   - Value: **exactly the same** as the `controller_token` value supplied to Terraform through `TF_VAR_controller_token`.
 
 3. `DOCKERHUB_USERNAME`
 
@@ -399,6 +399,8 @@ The request workflow calls the controller:
       -H "Content-Type: application/json" \
       ${{ secrets.CLOUD_RUN_CONTROLLER_URL }}/run
 ```
+
+The Cloud Run service accepts the HTTP request, and the controller application validates the shared `X-Controller-Token` header. This is application-level shared-secret validation, not Cloud Run IAM caller authentication.
 
 The build workflow uses your Docker Hub credentials:
 
@@ -432,21 +434,14 @@ The build workflow uses your Docker Hub credentials:
 ```yaml
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 ```
 
-You can trigger it in two ways:
+You can trigger it manually from GitHub:
 
 1. **Manually from GitHub UI**
 
    - Go to **Actions → Request Ephemeral Runner → Run workflow**.
    - Choose branch `main` and click **Run**.
-
-2. **Push to `main`**
-
-   - Commit and push any change to `main` to auto-trigger.
 
 Expected behavior:
 
@@ -460,6 +455,7 @@ Expected behavior:
 
 - Terraform (inside the controller container) ensures the infrastructure, including the `google_compute_instance.runner` resource, exists.
 - GCE VM boots, runs `runner/startup-script.sh`, installs GitHub Actions runner, and registers with labels `gce,ephemeral`.
+- The GitHub runner registration is ephemeral. After the job, the startup script shuts down the VM, while the Terraform-managed GCE instance resource may remain in a stopped state.
 
 You can observe:
 
@@ -501,6 +497,7 @@ on:
 
 jobs:
   build:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: [self-hosted, gce, ephemeral]
 ```
 
@@ -561,7 +558,7 @@ By following this guide you will:
 2. Create a GCS bucket `ci-platform-tf-state` for Terraform state.
 3. Create `ci-runner-sa` and `ci-controller-sa` service accounts with appropriate IAM roles.
 4. Build and push the Cloud Run controller image to Docker Hub (`dmitryzhuravlev/ci-runner-controller:latest`).
-5. Configure `terraform/terraform.tfvars` with your project, SAs, image, GitHub token, and controller token.
+5. Configure `terraform/terraform.tfvars` with non-sensitive project, service-account, image, and environment values; provide `github_token` and `controller_token` through `TF_VAR_*` environment variables.
 6. Run Terraform from `terraform/main.tf` to provision Cloud Run, the runner VM, and monitoring.
 7. Configure GitHub repository secrets expected by `.github/workflows/request-runner.yml` and `.github/workflows/build-and-push.yml`.
 8. Trigger the workflows to provision a runner and build/push `dmitryzhuravlev/ci-artifact:latest` from `application/Dockerfile`.
