@@ -22,7 +22,7 @@ flowchart TD
     F --> G[Runner shuts down]
 ```
 
-The request workflow calls the Cloud Run controller using the `CLOUD_RUN_CONTROLLER_URL` and `CLOUD_RUN_TOKEN` GitHub secrets. The build workflow is configured to run on a self-hosted runner with the `gce` and `ephemeral` labels.
+The request workflow calls the Cloud Run controller using the `CLOUD_RUN_CONTROLLER_URL` and `CLOUD_RUN_TOKEN` GitHub secrets. The build workflow is configured to run on a self-hosted runner with the `gce` and `ephemeral` labels. The current repository configuration uses a manual `workflow_dispatch` trigger because the demo GCP infrastructure is not kept running continuously.
 
 ## GitHub REST API Usage
 

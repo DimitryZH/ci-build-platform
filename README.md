@@ -339,8 +339,9 @@ see the troubleshooting guide:
 The GitHub Actions workflows (typically under `.github/workflows/`) are expected to:
 
 1. **Request Ephemeral Runner**
-   - Triggered manually with `workflow_dispatch` and on pushes to `main`.
+   - Triggered manually with `workflow_dispatch`.
    - Calls the Cloud Run controller to create a new GCE runner.
+   - The demo GCP infrastructure is not kept running continuously, so automatic push-based provisioning is intentionally disabled.
 
 2. **Execute CI Job on Ephemeral Runner**
    - Builds the Docker image from the sample app.  
