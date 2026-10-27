@@ -1,7 +1,6 @@
 import copy
 import json
 from pathlib import Path
-import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -15,13 +14,13 @@ class ProducerTests(unittest.TestCase):
     def setUp(self):
         self.inputs = dict(build_kind='online-shop', source_revision=REVISION,
                            components='frontend', platform='linux/amd64', build_arguments='[]')
-        self.reference = dict(repository=ci.CI_REPOSITORY, runId=10, attempt=2,
+        self.reference = dict(repository=ci.CI_REPOSITORY, runId=10, attempt=1,
                               toolingRevision='a' * 40, workflowRevision='a' * 40,
                               workflowRef=ci.CI_REPOSITORY + '/.github/workflows/request-runner.yml@refs/heads/main')
         self.event = dict(repository=dict(default_branch='main'), workflow_run=dict(
             repository=dict(full_name=ci.CI_REPOSITORY), head_repository=dict(full_name=ci.CI_REPOSITORY),
             event='workflow_dispatch', conclusion='success', path='.github/workflows/request-runner.yml',
-            id=10, run_attempt=2, head_sha='a' * 40, head_branch='main'))
+            id=10, run_attempt=1, head_sha='a' * 40, head_branch='main'))
         self.data = dict(requestVersion=1, request=self.reference, selection=ci.selection(self.inputs))
         self.plan = dict(planVersion=1, contractVersion=1, repository=ci.REPOSITORY,
                          sourceRevision=REVISION, toolingRevision=REVISION, workloadPath=ci.WORKLOAD,
@@ -48,7 +47,7 @@ class ProducerTests(unittest.TestCase):
         self.assertEqual(ci.correlate(self.data, self.event)['kind'], 'online-shop')
         sample = ci.envelope({}, self.reference)
         self.assertEqual(ci.correlate(sample, self.event)['kind'], 'sample')
-        for field, value in [('id', 11), ('run_attempt', 1), ('head_sha', 'b' * 40),
+        for field, value in [('id', 11), ('run_attempt', 2), ('head_sha', 'b' * 40),
                              ('head_branch', 'feature'), ('event', 'push'), ('conclusion', 'failure'),
                              ('head_repository', dict(full_name='attacker/repo'))]:
             event = copy.deepcopy(self.event)
@@ -90,13 +89,24 @@ class ProducerTests(unittest.TestCase):
                     return None
                 if fail == 'index':
                     return 'sha256:' + 'd' * 64, dict(schemaVersion=2, manifests=[])
-                return 'sha256:' + 'd' * 64, dict(schemaVersion=2, config=dict(digest=image['Id']))
+                config = 'sha256:' + 'e' * 64 if fail == 'published-config' else image['Id']
+                return 'sha256:' + 'd' * 64, dict(schemaVersion=2, config=dict(digest=config))
         def execute(command, cwd=None):
             calls.append(command)
             if command[1] == fail or (command[1:3] == ['buildx', 'build'] and fail == 'build'):
                 raise RuntimeError('fake operation failure')
+            if command[1:3] == ['buildx', 'build']:
+                self.assertIn('--load', command)
+                metadata = Path(command[command.index('--metadata-file') + 1])
+                self.assertFalse(metadata.is_relative_to(Path(cwd).resolve() / ci.WORKLOAD))
+                digest = 'invalid' if fail == 'invalid-build-config' else image['Id']
+                ci.write(metadata, {'containerimage.config.digest': digest})
             if command[1:3] == ['image', 'inspect']:
                 result = copy.deepcopy(image)
+                if '@' not in command[-1] and fail == 'loaded-config':
+                    result['Id'] = 'sha256:' + 'f' * 64
+                if '@' in command[-1] and fail in ('retrieved-config', 'published-config'):
+                    result['Id'] = 'sha256:' + 'e' * 64
                 if '@' in command[-1] and fail == 'label':
                     result['Config']['Labels']['org.opencontainers.image.revision'] = 'wrong'
                 if '@' in command[-1] and fail == 'platform':
@@ -112,16 +122,26 @@ class ProducerTests(unittest.TestCase):
             with patch.object(ci, 'prepare', return_value=(self.plan, self.data['destinations'])):
                 if fail:
                     with self.assertRaises((ValueError, RuntimeError, OSError)):
-                        ci.publish(root, self.data, self.reference | dict(runId=20, attempt=3), output, execute, Registry)
+                        ci.publish(root, self.data, self.reference | dict(runId=20), output, execute, Registry)
                     self.assertEqual(list(output.glob('*.result.json')), [])
+                    diagnostic = json.loads((output / 'failure.json').read_bytes())
+                    self.assertEqual(diagnostic['status'], 'failed')
+                    self.assertTrue(diagnostic['diagnostic'])
+                    if fail == 'published-config':
+                        self.assertIn('published manifest config', diagnostic['diagnostic'])
+                    if fail == 'retrieved-config':
+                        self.assertIn('retrieved image ID', diagnostic['diagnostic'])
                 else:
-                    ci.publish(root, self.data, self.reference | dict(runId=20, attempt=3), output, execute, Registry)
+                    ci.publish(root, self.data, self.reference | dict(runId=20), output, execute, Registry)
                     result = json.loads((output / 'frontend.result.json').read_bytes())
                     self.assertEqual(result['buildResultVersion'], 1)
-                    self.assertIn('q10a2-b20a3', result['image']['tag'])
+                    self.assertIn('q10a1-b20a1', result['image']['tag'])
                     self.assertEqual(result['image']['manifestDigest'], 'sha256:' + 'd' * 64)
                     self.assertNotEqual(result['image']['localImageId'], result['image']['manifestDigest'])
                     self.assertIsNone(result['image']['indexDigest'])
+                    self.assertEqual(result['image']['localImageId'], result['image']['configDigest'])
+                    buildx = json.loads((output / 'frontend.buildx.json').read_bytes())
+                    self.assertEqual(result['image']['localImageId'], buildx['containerimage.config.digest'])
                     self.assertEqual(result['sourceRevision'], REVISION)
                     self.assertEqual(result['build']['toolingRevision'], 'a' * 40)
                     self.assertTrue(any(c[1] == 'pull' and '@sha256:' in c[-1] for c in calls))
@@ -131,6 +151,11 @@ class ProducerTests(unittest.TestCase):
 
     def test_failures_never_emit_success(self):
         for failure in ['build', 'push', 'pull', 'registry', 'collision', 'missing', 'index', 'label', 'platform']:
+            with self.subTest(failure=failure):
+                self.exercise_publication(failure)
+
+    def test_publication_must_match_actual_build(self):
+        for failure in ['published-config', 'retrieved-config', 'loaded-config', 'invalid-build-config']:
             with self.subTest(failure=failure):
                 self.exercise_publication(failure)
 

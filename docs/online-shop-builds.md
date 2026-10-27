@@ -21,6 +21,19 @@ The Online Shop job installs Buildx with `docker/setup-buildx-action` and uses
 `docker buildx build --load` for upstream BuildKit cache mounts. The single-platform
 result is loaded into the local Docker store before the explicit push.
 
+The controller currently runs only `terraform init` and `terraform apply`.
+`terraform/gce-runners/main.tf` declares one persistent named VM and has no
+`desired_status` or explicit start operation. An unchanged apply is not evidence
+that an existing `TERMINATED` VM will boot. Before a fresh request after shutdown,
+the platform operator must establish a working create/start/re-registration path
+through the normal authorized infrastructure process. If that prerequisite cannot
+be established, stop and leave live acceptance pending; repeated dispatches will
+not repair it. This correction does not change Terraform or the controller.
+The deployed controller image/startup metadata were not inspected or updated:
+whether they match the repository's Python/EXIT/timeout template is unknown.
+Verify template version, Python availability, clean runner state and a new
+ephemeral registration for each execution; do not assume a stopped VM is reusable.
+
 Dispatch only reviewed requests from the default branch. The selected AML
 revision's Python planner and Dockerfiles execute code; a commit hash establishes
 identity, not trustworthiness. Source repository and workload are fixed to
@@ -56,12 +69,49 @@ job. It forwards the validated data in an artifact bound to the current build ru
 and attempt. The ephemeral job repeats correlation checks and recomputes the
 plan, contract hash and destinations from the selected AML revision.
 
-Missing artifacts or previous-attempt/mismatched envelopes fail closed. Retrying a
-request creates a new attempt artifact; retrying a build uses the original
-request identity and a new build attempt. Overlapping requests cannot exchange
-inputs. Capacity remains the existing singleton VM, so operators should dispatch
-one request at a time and wait for VM shutdown before repeating; this change does
-not add a capacity scheduler or guarantee simultaneous runner availability.
+Missing artifacts or previous-attempt/mismatched envelopes fail closed. A shared
+policy computes artifact names in the actual request, handoff and build jobs.
+Only attempt 1 of a fresh request and its original consumer execution is supported;
+there is no fallback to another attempt. The hosted request policy reads Actions
+run metadata with `actions: read` and rejects visible active request/build runs.
+Read failures also fail closed. This is an overlap preflight, not an atomic lock:
+API visibility delays and the request-to-consumer transition leave a race window.
+Operators must serialize the entire chain and independently observe VM cleanup.
+Overlapping capacity is unsupported; run-bound artifact lookup and envelope checks
+still prevent cross-request input consumption. No capacity scheduler is added.
+
+## Retry policy and recovery
+
+| Execution mode | Supported behavior |
+| --- | --- |
+| Fresh manual dispatch after failure | Supported request flow with new run ID, new artifacts and new publication identity, subject to capacity/startup prerequisites above |
+| Request workflow rerun (all/failed/specific jobs) | Fails on hosted request job before artifacts, planner or controller call |
+| Full consumer workflow rerun | Fails in hosted handoff before downloading any request artifact; self-hosted build is not scheduled |
+| Failed-jobs or specific build-job rerun | `runs-on` routes attempt > 1 to `ubuntu-latest`; the first policy step after checkout fails before artifacts, Docker credentials or build |
+| Overlapping request chains | Visible overlap fails hosted preflight; operators must also prevent the visibility/transition race by serial dispatch |
+
+The build job has its own routing and policy because rerunning only that job can
+reuse a successful handoff from attempt 1. It never requests a nonexistent
+`validated-request-<build-id>-2` or waits for a second ephemeral runner. Reruns are
+explicitly rejected rather than claimed to provide runner capacity. These controls
+apply to executions using the corrected workflow revision; reruns of older
+workflow revisions retain their older behavior and should be cancelled.
+See GitHub's [rerun semantics](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+
+Recovery steps:
+
+1. Preserve the failed run's diagnostics and any published tags; do not overwrite
+   them. A post-push identity failure can leave an image without a success result.
+2. Wait for the original chain to finish, confirm runner deregistration and
+   separately VM `TERMINATED`/shutdown observations. Resolve any orphan capacity
+   through the normal authorized operations process.
+3. Have the platform operator restore/verify the create/start and clean startup
+   prerequisites above. In particular, do not treat a stopped VM plus successful
+   Terraform apply as renewed capacity. If this remains unresolved, do not dispatch.
+4. Use the manual dispatch command above again with the same explicit AML SHA,
+   component and arguments. This creates a new request run at attempt 1, invokes
+   the existing controller flow again and creates a new consumer run at attempt 1.
+   Capture both new identities; no old request artifacts or publication tags are reused.
 
 GitHub's [workflow_run documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)
 specifies default-branch workflow execution and default-branch HEAD for
@@ -98,12 +148,25 @@ not provide compare-and-set tag publication here: out-of-band writers with push
 access must not race these reserved tags. Registry-side immutable tag policies
 can further restrict those writers.
 
+Buildx writes `--metadata-file` outside the source/build contexts. Its
+`containerimage.config.digest` must be a lowercase SHA-256 digest and equal the
+image ID inspected under the unique local tag immediately after `--load`. This
+binds the captured local image to this build's export. Missing/invalid metadata
+or a changed local tag fails before push. The supported exporter is the
+[single-platform Docker load](https://docs.docker.com/reference/cli/docker/buildx/build/#load-the-single-platform-build-result-to-docker-images---load);
+multi-platform/index exports are not supported.
+
 After push, the producer hashes raw registry manifest bytes and checks
 `Docker-Content-Digest`, retrieves the manifest by digest, pulls the image by that
 digest and inspects Linux/amd64 and the full OCI revision label. Only single image
-manifests are supported; unexpected indexes fail verification. Config digest,
-local image ID and manifest digest are distinct fields, even when config and
-local IDs match. No success record is emitted before all these checks pass.
+manifests are supported; unexpected indexes fail verification. It requires the
+strict equality `Buildx config digest == captured local image ID == published
+manifest config digest == image ID retrieved by repository@manifestDigest`.
+Different published config with an identical source label/platform still fails;
+the source label alone cannot bind an image to this build. Local/config IDs are
+never compared with the registry manifest digest as interchangeable identities.
+No success record is emitted before all these checks pass. Identity failures
+retain `failure.json`, Buildx metadata and any Docker logs for diagnosis.
 
 ## Build-result v1 and evidence
 
@@ -125,12 +188,13 @@ dependency locking remain upstream limitations. Docker layer/compiler caches are
 allowed; byte-identical or fully locked reproducibility is not claimed.
 
 `online-shop-evidence-<build-id>-<attempt>` retains the plan, successful component
-results and Docker logs for 90 days. A caught failure writes a separate
+results, Buildx metadata and Docker logs for 90 days. A caught failure writes a separate
 `failure.json`; earlier verified components in a multi-selection remain valid,
 but no failed component gets a success result. Failed push/verification may leave
-a tag in the registry without a success record. Keep it for diagnosis; retry with
-a new attempt identity rather than deleting or overwriting it. Request artifacts
-expire after 30 days, so very late build reruns must create a new request.
+a tag in the registry without a success record. Keep it for diagnosis; recover
+with a fresh manual request after cleanup/capacity checks, rather than deleting or
+overwriting it. Request artifacts expire after 30 days; rerunning old jobs is
+unsupported regardless of artifact retention.
 
 Copy the actual sanitized request, plan and result files into a new
 `docs/evidence/issue-1/<build-id>-<attempt>/` record through a focused reviewed
@@ -141,11 +205,17 @@ The initial durable pending record is `docs/evidence/issue-1/status.json`.
 
 ## Live validation and cleanup
 
-1. After merge, verify prerequisites and default-branch workflow revision, then
-   dispatch the pinned SHA with frontend only using the command above.
+1. After normal review/merge, confirm the default-branch correction revision.
+   Separately confirm controller/secret readiness, deployed startup metadata and
+   the create/start/re-registration prerequisites above. A merge does not repair
+   a stopped VM's lifecycle. Then dispatch the pinned SHA with frontend only using
+   the command above. Do not dispatch solely to exercise a known unavailable flow.
 2. Capture the request URL/attempt and the resulting build URL/attempt. Download
    their exact artifacts. Verify metadata identity against run details and
-   independently pull `repository@manifestDigest`; inspect platform/revision.
+   independently pull `repository@manifestDigest`; inspect platform/revision and
+   confirm its image ID equals result `localImageId` and `configDigest`. Compare
+   the retained Buildx config digest and the registry manifest's config digest
+   against those IDs. Keep the registry manifest digest as a separate identity.
 3. Observe runner deregistration via GitHub Actions runner settings/API. Separately
    check VM status `TERMINATED` using authorized GCP access and inspect serial or
    shutdown logs. Record sanitized timestamps/observations; Actions success alone
@@ -158,5 +228,11 @@ The initial durable pending record is `docs/evidence/issue-1/status.json`.
 5. Commit sanitized durable evidence and explicitly reassess each live acceptance
    item. Keep the issue open until publication, retrieval and cleanup are verified.
 
-Offline tests: `python -m unittest discover -s tests -v`. They fake Docker/registry
-operations and use disposable local Git repositories, with no cloud provisioning.
+Offline tests: install `tests/requirements.txt`, then run
+`python -m unittest discover -s tests -v`. They fake Docker, registry, GitHub
+metadata/artifacts and controller capacity, and use disposable local Git
+repositories. Workflow tests read the actual YAML, execute the production policy,
+request and validation CLI, and check routing, artifact names, rejection ordering,
+cross-request isolation and fresh-dispatch recovery with restored capacity.
+They do not prove that the deployed controller restarts a stopped VM, or provide
+new live evidence for the correction. Run actionlint and `git diff --check` too.

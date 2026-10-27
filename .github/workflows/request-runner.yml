@@ -26,6 +26,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   request-runner:
@@ -38,6 +39,11 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Reject reruns before validation or capacity
+        id: policy
+        env:
+          GH_READ_TOKEN: ${{ github.token }}
+        run: python3 ci/online_shop.py policy --phase request
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -47,7 +53,7 @@ jobs:
         run: python ci/online_shop.py request --handoff "$RUNNER_TEMP/request/request.json" --source "$RUNNER_TEMP/aml-request"
       - uses: actions/upload-artifact@v4
         with:
-          name: build-request-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ steps.policy.outputs.request_artifact }}
           path: ${{ runner.temp }}/request/
           if-no-files-found: error
           retention-days: 30

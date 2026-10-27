@@ -21,33 +21,41 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Reject consumer reruns before artifact retrieval
+        id: policy
+        run: python3 ci/online_shop.py policy --phase handoff
       - uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
-          name: build-request-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          name: ${{ steps.policy.outputs.request_artifact }}
           path: ${{ runner.temp }}/request
       - name: Validate triggering run and attempt
         id: validate
         run: python3 ci/online_shop.py validate --handoff "$RUNNER_TEMP/request/request.json"
       - uses: actions/upload-artifact@v4
         with:
-          name: validated-request-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ steps.policy.outputs.validated_artifact }}
           path: ${{ runner.temp }}/request/
           if-no-files-found: error
 
   build:
     needs: handoff
-    runs-on: [self-hosted, gce, ephemeral]
+    # A partial rerun can reuse successful needs without rerunning handoff.
+    # Route all retry attempts to hosted capacity, where the policy fails explicitly.
+    runs-on: ${{ github.run_attempt == 1 && fromJSON('["self-hosted", "gce", "ephemeral"]') || 'ubuntu-latest' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Reject partial job reruns before artifacts or registry credentials
+        id: policy
+        run: python3 ci/online_shop.py policy --phase build
       - uses: actions/download-artifact@v4
         with:
-          name: validated-request-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ steps.policy.outputs.validated_artifact }}
           path: ${{ runner.temp }}/request
       - name: Revalidate handoff on runner
         run: python3 ci/online_shop.py validate --handoff "$RUNNER_TEMP/request/request.json"
@@ -70,7 +78,7 @@ jobs:
         if: needs.handoff.outputs.kind == 'online-shop'
         run: python3 ci/online_shop.py build --handoff "$RUNNER_TEMP/request/request.json" --source "$RUNNER_TEMP/aml-build" --output "$RUNNER_TEMP/build-evidence"
       - uses: actions/upload-artifact@v4
-        if: always() && needs.handoff.outputs.kind == 'online-shop'
+        if: always() && steps.policy.outcome == 'success' && needs.handoff.outputs.kind == 'online-shop'
         with:
           name: online-shop-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/build-evidence/

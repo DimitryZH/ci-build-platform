@@ -71,6 +71,47 @@ def identity(env):
                 workflowRevision=env['GITHUB_WORKFLOW_SHA'], workflowRef=env['GITHUB_WORKFLOW_REF'])
 
 
+def execution_policy(env, phase, event=None):
+    """Only fresh dispatch chains may consume the singleton ephemeral capacity."""
+    require(env['GITHUB_RUN_ATTEMPT'] == '1',
+            'Workflow/job reruns are unsupported; verify cleanup and capacity, then create a fresh manual request')
+    run_id = env['GITHUB_RUN_ID']
+    require(re.fullmatch('[1-9][0-9]*', run_id), 'invalid run ID')
+    if phase == 'request':
+        require(env['GITHUB_EVENT_NAME'] == 'workflow_dispatch', 'manual request required')
+        return dict(request_artifact=f'build-request-{run_id}-1')
+    require(phase in ('handoff', 'build') and env['GITHUB_EVENT_NAME'] == 'workflow_run',
+            'invalid consumer phase/event')
+    trigger = event['workflow_run']
+    require(type(trigger['run_attempt']) is int and trigger['run_attempt'] == 1,
+            'Rerun request attempts are unsupported; create a fresh manual request')
+    require(type(trigger['id']) is int and trigger['id'] > 0, 'invalid request run ID')
+    return dict(request_artifact=f"build-request-{trigger['id']}-1",
+                validated_artifact=f'validated-request-{run_id}-1')
+
+
+def github_runs(workflow, page, token):
+    url = (f'https://api.github.com/repos/{CI_REPOSITORY}/actions/workflows/{workflow}/runs'
+           f'?per_page=100&page={page}')
+    request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token,
+                                                 'Accept': 'application/vnd.github+json'})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return json.load(response)['workflow_runs']
+
+
+def check_capacity_window(run_id, fetch_runs):
+    """Reject visible overlapping chains; operators still serialize the singleton."""
+    for workflow in ('request-runner.yml', 'build-and-push.yml'):
+        page = 1
+        while True:
+            runs = fetch_runs(workflow, page)
+            require(all(r['id'] == int(run_id) or r['status'] == 'completed' for r in runs),
+                    'Another runner request/build is active; wait for the whole chain and VM cleanup before a fresh dispatch')
+            if len(runs) < 100:
+                break
+            page += 1
+
+
 def materialize(root, revision):
     require(not root.exists(), 'source directory must be new')
     run(['git', 'init', str(root)])
@@ -207,9 +248,11 @@ class Registry:
             raise
 
 
-def build_command(plan, component, tag):
+def build_command(plan, component, tag, metadata=None):
     command = ['docker', 'buildx', 'build', '--load', '--platform', plan['platform'], '-t', tag,
                '-f', WORKLOAD + '/' + safe_path(component['dockerfile'])]
+    if metadata is not None:
+        command += ['--metadata-file', str(metadata)]
     if component['target'] is not None:
         command += ['--target', component['target']]
     for key, value in sorted(component['buildArguments'].items()):
@@ -217,7 +260,7 @@ def build_command(plan, component, tag):
     return command + [WORKLOAD + '/' + safe_path(component['buildContext'])]
 
 
-def publish(root, data, build, output, execute=run, registry_factory=Registry):
+def _publish(root, data, build, output, execute, registry_factory):
     plan, destinations = prepare(root, data['selection'])
     require(plan == data['plan'] and destinations == data['destinations'] and
             sha(encoded(plan)) == data['planSha256'] and
@@ -229,16 +272,24 @@ def publish(root, data, build, output, execute=run, registry_factory=Registry):
         tag = (f"sha-{plan['sourceRevision']}-q{request['runId']}a{request['attempt']}"
                f"-b{build['runId']}a{build['attempt']}")
         registry = registry_factory(repository)
-        require(registry.manifest(tag) is None, 'publication identity already exists; use a new build attempt')
+        require(registry.manifest(tag) is None, 'publication identity already exists; create a fresh manual request')
         full_tag = repository + ':' + tag
-        execute(build_command(plan, c, full_tag), cwd=root)
+        metadata = (output / (c['id'] + '.buildx.json')).resolve()
+        require(not metadata.exists(), 'build metadata path must be new')
+        execute(build_command(plan, c, full_tag, metadata), cwd=root)
+        built = json.loads(metadata.read_bytes()).get('containerimage.config.digest')
+        require(isinstance(built, str) and re.fullmatch('sha256:[0-9a-f]{64}', built),
+                'missing/invalid Buildx config digest for single-platform load')
         local = json.loads(execute(['docker', 'image', 'inspect', full_tag]))[0]['Id']
+        require(local == built, 'loaded local image ID differs from Buildx config digest')
         execute(['docker', 'push', full_tag])
         published = registry.manifest(tag)
         require(published is not None, 'published manifest missing')
         digest, manifest = published
         require(manifest.get('schemaVersion') == 2 and 'config' in manifest and 'manifests' not in manifest,
                 'expected a single image manifest, not an index')
+        require(manifest['config'].get('digest') == local,
+                'published manifest config digest differs from built local image ID')
         require(registry.manifest(digest) == published, 'manifest not retrievable by digest')
         immutable = repository + '@' + digest
         execute(['docker', 'pull', '--platform', plan['platform'], immutable])
@@ -246,7 +297,8 @@ def publish(root, data, build, output, execute=run, registry_factory=Registry):
         require(image['Os'] + '/' + image['Architecture'] == plan['platform'] and
                 image['Config']['Labels'].get('org.opencontainers.image.revision') == plan['sourceRevision'],
                 'published platform/source label mismatch')
-        require(image['Id'] == manifest['config']['digest'], 'retrieved image config ID mismatch')
+        require(image['Id'] == manifest['config']['digest'] == local == built,
+                'retrieved image ID differs from manifest config/built local image ID')
         result = dict(buildResultVersion=1, status='published-and-verified', componentId=c['id'],
                       sourceRepository=REPOSITORY, sourceRevision=plan['sourceRevision'], workloadPath=WORKLOAD,
                       contract=dict(version=plan['contractVersion'], path=WORKLOAD + '/build.contract.json',
@@ -256,6 +308,20 @@ def publish(root, data, build, output, execute=run, registry_factory=Registry):
                       image=dict(repository=repository, tag=tag, manifestDigest=digest, indexDigest=None,
                                  localImageId=local, configDigest=image['Id']))
         write(output / (c['id'] + '.result.json'), result)
+
+
+def record_failure(output, error):
+    write(output / 'failure.json', dict(status='failed', errorType=type(error).__name__,
+          diagnostic=str(error) if isinstance(error, ValueError)
+          else 'Inspect operation and restricted infrastructure logs'))
+
+
+def publish(root, data, build, output, execute=run, registry_factory=Registry):
+    try:
+        _publish(root, data, build, output, execute, registry_factory)
+    except Exception as error:
+        record_failure(output, error)
+        raise
 
 
 def logged_executor(output):
@@ -275,12 +341,26 @@ def logged_executor(output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation', choices=['request', 'validate', 'build'])
-    parser.add_argument('--handoff', type=Path, required=True)
+    parser.add_argument('operation', choices=['policy', 'request', 'validate', 'build'])
+    parser.add_argument('--phase', choices=['request', 'handoff', 'build'])
+    parser.add_argument('--handoff', type=Path)
     parser.add_argument('--source', type=Path)
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
+    if args.operation == 'policy':
+        event = (json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_bytes())
+                 if args.phase != 'request' else None)
+        outputs = execution_policy(os.environ, args.phase, event)
+        if args.phase == 'request':
+            check_capacity_window(os.environ['GITHUB_RUN_ID'],
+                                  lambda workflow, page: github_runs(workflow, page, os.environ['GH_READ_TOKEN']))
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+            for key, value in outputs.items():
+                stream.write(key + '=' + value + '\n')
+        return
+    require(args.handoff is not None, '--handoff is required')
     if args.operation == 'request':
+        execution_policy(os.environ, 'request')
         inputs = json.loads(os.environ['DISPATCH_INPUTS'])
         request = selection(inputs)
         if request['kind'] == 'online-shop':
@@ -291,8 +371,9 @@ def main():
         if 'plan' in data:
             write(args.handoff.parent / 'plan.json', data['plan'])
     else:
-        data = json.loads(args.handoff.read_bytes())
         event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_bytes())
+        execution_policy(os.environ, 'build' if args.operation == 'build' else 'handoff', event)
+        data = json.loads(args.handoff.read_bytes())
         request = correlate(data, event)
         if args.operation == 'validate':
             with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
@@ -305,8 +386,7 @@ def main():
                 publish(args.source, data, identity(os.environ), args.output,
                         execute=logged_executor(args.output))
             except Exception as error:
-                write(args.output / 'failure.json', dict(status='failed', errorType=type(error).__name__,
-                      diagnostic=str(error) if isinstance(error, ValueError) else 'Inspect operation and restricted infrastructure logs'))
+                record_failure(args.output, error)
                 raise
 
 
