@@ -63,6 +63,9 @@ jobs:
         run: |
           docker build -f application/Dockerfile -t "$DOCKERHUB_USERNAME/ci-artifact:latest" application
           docker push "$DOCKERHUB_USERNAME/ci-artifact:latest"
+      - name: Set up BuildKit for upstream cache mounts
+        if: needs.handoff.outputs.kind == 'online-shop'
+        uses: docker/setup-buildx-action@v3
       - name: Build, publish and verify selected Online Shop components
         if: needs.handoff.outputs.kind == 'online-shop'
         run: python3 ci/online_shop.py build --handoff "$RUNNER_TEMP/request/request.json" --source "$RUNNER_TEMP/aml-build" --output "$RUNNER_TEMP/build-evidence"

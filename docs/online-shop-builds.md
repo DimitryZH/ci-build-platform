@@ -17,6 +17,9 @@ stops the VM through an EXIT trap, including failure paths. Existing provisioned
 templates are not automatically updated by this PR; deployment of that template
 through the normal reviewed infrastructure process is a prerequisite for those
 cleanup improvements. No Terraform deployment was performed for implementation.
+The Online Shop job installs Buildx with `docker/setup-buildx-action` and uses
+`docker buildx build --load` for upstream BuildKit cache mounts. The single-platform
+result is loaded into the local Docker store before the explicit push.
 
 Dispatch only reviewed requests from the default branch. The selected AML
 revision's Python planner and Dockerfiles execute code; a commit hash establishes

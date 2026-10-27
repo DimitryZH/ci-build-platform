@@ -68,7 +68,7 @@ class ProducerTests(unittest.TestCase):
         self.assertIn('SKAFFOLD_GO_GCFLAGS=all=-N -l', command)
         self.assertNotIn('--target', command)
         c['target'] = 'final'
-        self.assertEqual(ci.build_command(self.plan, c, 'tag')[8:10], ['--target', 'final'])
+        self.assertEqual(ci.build_command(self.plan, c, 'tag')[10:12], ['--target', 'final'])
         for path in ['../escape', '/abs', 'a/../b', 'C:/abs', 'a\\b']:
             with self.assertRaises(ValueError):
                 ci.safe_path(path)
@@ -93,7 +93,7 @@ class ProducerTests(unittest.TestCase):
                 return 'sha256:' + 'd' * 64, dict(schemaVersion=2, config=dict(digest=image['Id']))
         def execute(command, cwd=None):
             calls.append(command)
-            if command[1] == fail:
+            if command[1] == fail or (command[1:3] == ['buildx', 'build'] and fail == 'build'):
                 raise RuntimeError('fake operation failure')
             if command[1:3] == ['image', 'inspect']:
                 result = copy.deepcopy(image)

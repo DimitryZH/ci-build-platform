@@ -208,7 +208,7 @@ class Registry:
 
 
 def build_command(plan, component, tag):
-    command = ['docker', 'build', '--platform', plan['platform'], '-t', tag,
+    command = ['docker', 'buildx', 'build', '--load', '--platform', plan['platform'], '-t', tag,
                '-f', WORKLOAD + '/' + safe_path(component['dockerfile'])]
     if component['target'] is not None:
         command += ['--target', component['target']]
