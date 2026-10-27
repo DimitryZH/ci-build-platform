@@ -1,0 +1,42 @@
+{
+  "evidenceVersion": 1,
+  "status": "live-acceptance-pending",
+  "date": "2026-10-27",
+  "issue": "https://github.com/DimitryZH/ci-build-platform/issues/1",
+  "sourceRepository": "https://github.com/DimitryZH/application-modernization-lab",
+  "sourceRevision": "87c39c498ebf4b7f9b7347f7b317aae27a0630f3",
+  "components": ["frontend"],
+  "platform": "linux/amd64",
+  "contractSha256": "2a78958157874a90b8ac633def1f337449b7f5c73beaf6e46bde05b388f6995b",
+  "defaultFrontendPlanSha256": "85a8a17518a86bbd0cf3fbf622808b02499660e26f8c756eff4d5235c2ce38f8",
+  "debugFrontendPlanSha256": "1b11f2c56e23658a5f280ac2ed42d3a51a3d48c913afab19eab22c05ba762adb",
+  "offlineValidation": {
+    "reviewedBase": "3739e4fedee39ff2e0198525e1beb61339093842",
+    "producerTests": "17 unittest methods passed on the correction, including original failure subcases, four new build/publication identity failure subcases and workflow-to-code retry/recovery tests",
+    "realUpstreamPlan": "default frontend plan reconsumed on the correction from the existing pinned isolated checkout; tracked workload bytes and planner input hashes verified against pinned Git blobs; plan hash unchanged",
+    "destination": "docker.io/dmitryzhuravlev/online-shop-frontend",
+    "historicalChecks": "The reviewed base fetched/materialized the pinned SHA and consumed default/debug plans. Those checks are historical offline evidence, not live validation of this correction.",
+    "workflowLint": "actionlint 1.7.12 passed with repository self-hosted label configuration; shellcheck and pyflakes integrations disabled",
+    "whitespace": "git diff --check passed"
+  },
+  "publicationIdentityPolicy": "Require single-platform Buildx --load config digest == captured local image ID == published manifest config digest == image ID retrieved by registry manifest digest. Mismatches retain failure.json/Buildx metadata and emit no successful component result. Manifest digest remains a separate identity.",
+  "retryPolicy": {
+    "supported": "Fresh manual request at attempt 1 with new run/attempt-bound artifacts and publication identity, after independent cleanup and capacity/startup readiness checks",
+    "requestRerun": "Rejected on hosted request job before artifacts/planner/controller",
+    "fullConsumerRerun": "Rejected on hosted handoff before artifact retrieval; no self-hosted build scheduled",
+    "partialBuildRerun": "Attempt > 1 routed to ubuntu-latest and rejected before artifacts or registry credentials, including cached successful handoff",
+    "overlap": "Visible active request/build runs rejected on hosted preflight using read-only Actions metadata. This is not an atomic lock: operators serialize the full chain across API visibility and request-to-consumer transition gaps. Request identities cannot be exchanged."
+  },
+  "liveRequest": null,
+  "liveBuild": null,
+  "publication": null,
+  "runnerCleanup": {"status": "not-observed", "reason": "No live runner request dispatched"},
+  "blocker": "workflow_run executes the default-branch workflow. New handoff/build behavior requires normal review and merge before end-to-end validation; no merge or bypass was performed.",
+  "infrastructurePrerequisites": {
+    "stoppedVm": "Controller code only runs Terraform init/apply; the singleton VM resource has no desired_status or explicit start operation. A stopped VM is not proven to restart or re-register on another request. Operator must restore/verify the normal create/start path before recovery dispatch; lifecycle repair is outside this correction.",
+    "deployedStartup": "Deployed controller image/startup metadata not inspected or updated; match to repository Python/EXIT/90-minute template is unknown. Verify version, clean runner state and new ephemeral registration before live validation.",
+    "credentialsAndServices": "Existing infrastructure and configured secret readiness remain unverified; no raw credentials accessed and no cloud provisioning performed."
+  },
+  "remainingSteps": "Follow docs/online-shop-builds.md Live validation and cleanup, then commit actual sanitized request/plan/results and cleanup observations.",
+  "claims": "Offline implementation evidence only; not a successful publication, release approval or cryptographic provenance."
+}

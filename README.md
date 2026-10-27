@@ -17,6 +17,12 @@ The project demonstrates practical Platform Engineering and CI concepts, includi
 
 > **Current operating mode:** the demo GCP infrastructure is not kept running continuously. Runner provisioning is triggered manually with `workflow_dispatch`.
 
+The manual flow supports the sample and explicit AML Online Shop build requests.
+See [Online Shop builds](docs/online-shop-builds.md) for request inputs, immutable
+handoff, publication metadata and post-merge live validation. Initial Online Shop
+live acceptance is pending; [durable evidence](docs/evidence/issue-1/status.json)
+distinguishes offline checks from actual publication.
+
 ## Architecture
 
 ### Core Components

@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Stop the VM on setup failures and unsuccessful runner exits too.
+trap 'shutdown -h now' EXIT
+
 # ---- CONFIG ----
 RUNNER_VERSION="2.317.0"
 RUNNER_DIR="/opt/github-runner"
@@ -17,6 +20,7 @@ apt-get install -y \
   jq \
   ca-certificates \
   git \
+  python3 \
   docker.io
 
 systemctl start docker
@@ -51,7 +55,5 @@ sudo -u ubuntu ./config.sh \
   --ephemeral
 
 # ---- RUN ----
-sudo -u ubuntu ./run.sh
-
-# ---- SELF-DESTRUCT ----
-shutdown -h now
+# Bound idle/orphan capacity when the downstream handoff or job cannot start.
+timeout --signal=TERM --kill-after=60s 90m sudo -u ubuntu ./run.sh
