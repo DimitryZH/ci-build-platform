@@ -1,17 +1,65 @@
 name: Request Ephemeral Runner
 
 on:
-   # Manual trigger only because the demo GCP infrastructure is not kept running continuously.
-   workflow_dispatch:
+  workflow_dispatch:
+    inputs:
+      build_kind:
+        type: choice
+        options: [sample, online-shop]
+        default: sample
+      source_revision:
+        description: Full lowercase AML commit SHA (Online Shop only)
+        type: string
+        default: ''
+      components:
+        description: Space-separated explicit component IDs (Online Shop only)
+        type: string
+        default: ''
+      platform:
+        type: choice
+        options: [linux/amd64]
+        default: linux/amd64
+      build_arguments:
+        description: JSON string array, e.g. ["frontend.SKAFFOLD_GO_GCFLAGS=all=-N -l"]
+        type: string
+        default: '[]'
+
+permissions:
+  contents: read
 
 jobs:
-   request-runner:
-      runs-on: ubuntu-latest
-
-      steps:
-         - name: Request GCE runner from Cloud Run controller
-           run: |
-              curl -X POST \
-                -H "X-Controller-Token: ${{ secrets.CLOUD_RUN_TOKEN }}" \
-                -H "Content-Type: application/json" \
-                ${{ secrets.CLOUD_RUN_CONTROLLER_URL }}/run
+  request-runner:
+    # The existing workflow_run consumer executes on the default branch.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate request and upstream plan before capacity
+        env:
+          DISPATCH_INPUTS: ${{ toJSON(inputs) }}
+        run: python ci/online_shop.py request --handoff "$RUNNER_TEMP/request/request.json" --source "$RUNNER_TEMP/aml-request"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-request-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/request/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Request GCE runner from Cloud Run controller
+        env:
+          CONTROLLER_URL: ${{ secrets.CLOUD_RUN_CONTROLLER_URL }}
+          CONTROLLER_TOKEN: ${{ secrets.CLOUD_RUN_TOKEN }}
+        # Suppress response bodies and curl errors that can contain private endpoint details.
+        run: |
+          if ! curl --silent --fail --output /dev/null --max-time 600 -X POST \
+            -H "X-Controller-Token: $CONTROLLER_TOKEN" \
+            -H 'Content-Type: application/json' "$CONTROLLER_URL/run"; then
+            echo 'Controller request failed; inspect restricted controller logs.' >&2
+            exit 1
+          fi

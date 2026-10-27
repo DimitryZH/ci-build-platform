@@ -1,0 +1,336 @@
+{
+  "components": [
+    {
+      "buildArguments": {
+        "SKAFFOLD_GO_GCFLAGS": "",
+        "SOURCE_REVISION": "87c39c498ebf4b7f9b7347f7b317aae27a0630f3"
+      },
+      "buildContext": "src/frontend",
+      "copySources": [
+        "go.mod",
+        "go.sum",
+        ".",
+        "templates",
+        "static"
+      ],
+      "dockerfile": "src/frontend/Dockerfile",
+      "dockerfileSha256": "e8e6ab9d4b52adfb20567df769ec5ee793715900e732d786a4f85fa84bb2ea88",
+      "dockerignore": [
+        "vendor/"
+      ],
+      "id": "frontend",
+      "inputs": [
+        {
+          "path": "src/frontend/.dockerignore",
+          "sha256": "e15b1b0e0f10012abb6f06891455da689a7a4ff323b70ce46144d8611b7d4d8a"
+        },
+        {
+          "path": "src/frontend/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "src/frontend/Dockerfile",
+          "sha256": "e8e6ab9d4b52adfb20567df769ec5ee793715900e732d786a4f85fa84bb2ea88"
+        },
+        {
+          "path": "src/frontend/README.md",
+          "sha256": "7eaaadf5badc6d88fc1c39e4eec70ccdc62d2a132bb9f43008526cd4dd45412e"
+        },
+        {
+          "path": "src/frontend/deployment_details.go",
+          "sha256": "7e034f458b92198237f01f29a2129829456b06a009065149a36595dc7f6f0969"
+        },
+        {
+          "path": "src/frontend/genproto.sh",
+          "sha256": "854723fde6c8b3674f49134890b30788cad972a3f7ee32f36c631b4bc5cb881f"
+        },
+        {
+          "path": "src/frontend/genproto/demo.pb.go",
+          "sha256": "799971d468d1e66e0d7fce8930ce74f8f1c894bf8425c50cad44c2a9b40cd9af"
+        },
+        {
+          "path": "src/frontend/genproto/demo_grpc.pb.go",
+          "sha256": "70bb93b42e93399bf30d9971b6568244d0fa2eb1cb4757f967354810601dc916"
+        },
+        {
+          "path": "src/frontend/go.mod",
+          "sha256": "6aa65d8bdb87f2b54d9eb7e0a76a0c914f063e487b2733ddfc79186b007726ae"
+        },
+        {
+          "path": "src/frontend/go.sum",
+          "sha256": "e9e006043c492dad4b493e608b60527471a951808a5bd9e0ed76572d34874d9a"
+        },
+        {
+          "path": "src/frontend/handlers.go",
+          "sha256": "bb6980c63715a25d824e4c0981f946f047094aa63e352312cfa4e9d11580386b"
+        },
+        {
+          "path": "src/frontend/main.go",
+          "sha256": "e816286f96c059ac25f30bd8131e800c762b2270f51cbdd7ffe1d823aced87d9"
+        },
+        {
+          "path": "src/frontend/middleware.go",
+          "sha256": "31ba12b7ca49f4d4a7666da9bcd770d8c8260e52b90023a5c26e774cc9a0361e"
+        },
+        {
+          "path": "src/frontend/money/money.go",
+          "sha256": "0fbc88a9b0ed94a94f22e853850b15f693c3a13b2ac1add443e2ccd70db0e83c"
+        },
+        {
+          "path": "src/frontend/money/money_test.go",
+          "sha256": "e28ed8c745887282862aee796d5266007855b28bf67871b1f37a5eb10fe02fdb"
+        },
+        {
+          "path": "src/frontend/packaging_info.go",
+          "sha256": "06e4dae41bd1169ddefcca47486a02a586df2cf4ef9ae30d8dbf6aebb6747116"
+        },
+        {
+          "path": "src/frontend/rpc.go",
+          "sha256": "656d019a11d885bdeb02574d5cc9f7c941beab23de976474f6e0e3b2e96ba56d"
+        },
+        {
+          "path": "src/frontend/static/favicon-cymbal.ico",
+          "sha256": "f7ebfa829ea118ed7bf1650eee7f07da8ca72a3eea48ef55a1118e08605c8faf"
+        },
+        {
+          "path": "src/frontend/static/favicon.ico",
+          "sha256": "d1dca2da81434efd34dfd1e1bcb11cd5e126a4626af9e18c444bed72b2956b07"
+        },
+        {
+          "path": "src/frontend/static/icons/Cymbal_NavLogo.svg",
+          "sha256": "641f4a2561aa55a772baba08923ce09ebaa5fcb8d17034797785ad9a7abb6342"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_Advert2.svg",
+          "sha256": "b9bd89869e9cb8f748f1d952024c9c750961c338fd3c1d6070cf784fec4409c3"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_CartIcon.svg",
+          "sha256": "1ec485f472c27bb577df95f51f5629a88fb980aa52196c0954abf14e22dbc823"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_CheckOutIcon.svg",
+          "sha256": "6eea0b1d9d47bc6ba7765247dcf1a0230f794f8a5a529ebcadb3a96a1259e98d"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_CurrencyIcon.svg",
+          "sha256": "57a699d912c160b15062cf4c3be18d5bd9458215a8ac5828662ce5a710d00343"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_DownArrow.svg",
+          "sha256": "5fe6a77411991068deda6f3fe05e047dbda51beacbb5ade1b7f610dd02563646"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_FacebookIcon.svg",
+          "sha256": "9aeee538054e67d6e85765039c6d850136b343592e8059be73190427c619c60a"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_GooglePlayIcon.svg",
+          "sha256": "1d3d9c2badfc003bbe879fb5a42c3c1b2bf75c3c96e207da16e707edc819d65c"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_HelpIcon.svg",
+          "sha256": "9066f8af3e5c4011d883ed66f96da6b97fbaf45fa664a9043b7b40654d5d856b"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_HeroLogo.svg",
+          "sha256": "097b93b3a1ab408c367e5a525121ae6a1ba53b42b5e30a257cc9ea87d9e9ba5a"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_HeroLogoMaroon.svg",
+          "sha256": "d71c20858feca58090fe5604e66425705c6f672e2bf36e31d7043a6d599ea6b0"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_InstagramIcon.svg",
+          "sha256": "8595ce8efebc4eeb6956f06c5d0487904894b10d8594e98da617bf3293035fa8"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_KitchenwareOffer.svg",
+          "sha256": "8c129ed2635679d76076a199f2102810b69d754b352533b0739cc7aec993a93c"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_NavLogo.svg",
+          "sha256": "e3047ee6a4621aff5d2d4284cc263c046de808ad8a953d751c87ffbe94dd32fb"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_PinterestIcon.svg",
+          "sha256": "707aa1ea30981a31a5ac0566f0dd6950eb53b3d722507a2d21dc04903bc790f8"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_ProfileIcon.svg",
+          "sha256": "13f10e5ad70ba89ae751d26f6c8b1683e8c889ce9613a79c49bfcc4e4096665c"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_SearchIcon.svg",
+          "sha256": "848e39b2ceecc9257037aa64f7d735676a565c51577ebd452932884ac80ae41a"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_TwitterIcon.svg",
+          "sha256": "5a363c655888ca0bae33fc162ef8f738175f16c5df640fdaf67691ca0fc68e63"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_UpDownControl.svg",
+          "sha256": "8209202982500705a97416a3e8997e57d44ae55d210c4fa6cd4db49a09a47a6c"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_WandIcon.svg",
+          "sha256": "63065183e5d1ccc97cbe22ca43b0c983e8d402ab55db1a0cda94cb649e3135c6"
+        },
+        {
+          "path": "src/frontend/static/icons/Hipster_YoutubeIcon.svg",
+          "sha256": "eb1ef8e04ae5322c67d87f6088cce9849d2e27ae8b2c11fd11d5eb479b7b8dba"
+        },
+        {
+          "path": "src/frontend/static/images/Advert2BannerImage.png",
+          "sha256": "f845a43f2caf463e08b63c1633545096193a0f1c2c32cb09e3d0efa82d4de197"
+        },
+        {
+          "path": "src/frontend/static/images/AdvertBannerImage.png",
+          "sha256": "ca5257f89b3a6162413e38fb4ec67f79daf893ab8cc999b358b64c04a6add287"
+        },
+        {
+          "path": "src/frontend/static/images/HeroBannerImage.png",
+          "sha256": "ccb63422295c65a609c121d9c1c32701bd59c923abd9b1f8ca37ca47ba0f3b7c"
+        },
+        {
+          "path": "src/frontend/static/images/HeroBannerImage2.png",
+          "sha256": "7aeed19593cc3c24aa780923066609e24582297739ad54873726ebe9f2a497f2"
+        },
+        {
+          "path": "src/frontend/static/images/VRHeadsets.png",
+          "sha256": "00e71021cae1d7c44745b48427e648109900101546b55778de9f3efddc5a75ca"
+        },
+        {
+          "path": "src/frontend/static/images/credits.txt",
+          "sha256": "53608520c6adfe52eb38801fef5c7e819b97131b16b97f9a143cd6af14934e45"
+        },
+        {
+          "path": "src/frontend/static/images/folded-clothes-on-white-chair-wide.jpg",
+          "sha256": "efec77c820eed5dbbcab2d3e87b1089f031155b43547bf1693c1a012e91624dc"
+        },
+        {
+          "path": "src/frontend/static/images/folded-clothes-on-white-chair.jpg",
+          "sha256": "3872a9ac8b09335a62bd969863d027e89ceab043e383168f4277409886b97338"
+        },
+        {
+          "path": "src/frontend/static/img/products/bamboo-glass-jar.jpg",
+          "sha256": "b0420ee90c2499ea4eed9f5181525dc83de4e206a4e736e82088142b7506bcbb"
+        },
+        {
+          "path": "src/frontend/static/img/products/candle-holder.jpg",
+          "sha256": "2897f45d77b1a381957c66ab737b4f65e15ff90aa18cb1ebd23dce20d6650601"
+        },
+        {
+          "path": "src/frontend/static/img/products/hairdryer.jpg",
+          "sha256": "8140cc5377f60a6eb61626210cd7bdf426c867785648aaec87812b1807d26e77"
+        },
+        {
+          "path": "src/frontend/static/img/products/loafers.jpg",
+          "sha256": "80990062d4e2b530d566f80192b425cf10db1803da565caff6685d6d06e40637"
+        },
+        {
+          "path": "src/frontend/static/img/products/mug.jpg",
+          "sha256": "8b02d847a76ac1547caea004aff8f1bfc225c848a5e43498dd1b541804754ced"
+        },
+        {
+          "path": "src/frontend/static/img/products/salt-and-pepper-shakers.jpg",
+          "sha256": "c44d1c543a7bf3305a6741d21a97821128710dc5d2be5f2a25a5bbd711c72001"
+        },
+        {
+          "path": "src/frontend/static/img/products/sunglasses.jpg",
+          "sha256": "8d0dbd98e230e3918f7aaefb79b365d25e0597529c6bde0a1bca4c918c0b8cfb"
+        },
+        {
+          "path": "src/frontend/static/img/products/tank-top.jpg",
+          "sha256": "1c62bff8ba375d7a1f790b9d8ddff7bb97acf83f571d594e382630ce69c14fca"
+        },
+        {
+          "path": "src/frontend/static/img/products/watch.jpg",
+          "sha256": "22362a2c2b009456d4bcd704938675532a65aebe5c5c710707d797f411e480b3"
+        },
+        {
+          "path": "src/frontend/static/styles/bot.css",
+          "sha256": "6c794d254695b70aa2442f3573d4814ebbfe6063fbe298ea1ece22b9205e96f5"
+        },
+        {
+          "path": "src/frontend/static/styles/cart.css",
+          "sha256": "6df04512be8831a42018790a6193a235d79dabdbd4f59aaaa6943a7e08040b30"
+        },
+        {
+          "path": "src/frontend/static/styles/order.css",
+          "sha256": "9141d8a37448d176046fbfba0d8c4a20cbb89c83b7ba28f20a0a736d72fc514f"
+        },
+        {
+          "path": "src/frontend/static/styles/styles.css",
+          "sha256": "6e05495378d9c97694629422edb006d8e2e60591f736620aaf920e1cf2833e20"
+        },
+        {
+          "path": "src/frontend/telemetry.go",
+          "sha256": "2e8de2280bb85f4038161750019d4286c32dc743ee165c4c725db54ce0cb8fe5"
+        },
+        {
+          "path": "src/frontend/telemetry_test.go",
+          "sha256": "a004fe8355278d7ea27d01f5a378e8cff6269619c8856518ed0399d98029a317"
+        },
+        {
+          "path": "src/frontend/templates/ad.html",
+          "sha256": "e830540c5215630a50283a2c03507cbb98a1e1b7fa1e24681d4472dfac99cc03"
+        },
+        {
+          "path": "src/frontend/templates/assistant.html",
+          "sha256": "8cfdd14534a56c2e86f44813d8ab915124dbee2789ef06e2ebea3abb31ffb05d"
+        },
+        {
+          "path": "src/frontend/templates/cart.html",
+          "sha256": "5a631d110b17f4480b756651fefe6fc37a7b5a3390952bd5ac75093cb8fcfd0a"
+        },
+        {
+          "path": "src/frontend/templates/error.html",
+          "sha256": "2a62cb9e5f9373dd1f6b2143b7d491de5bdf119856148667e87138b493c7e1c7"
+        },
+        {
+          "path": "src/frontend/templates/footer.html",
+          "sha256": "da4a66cfc231ea8250c6dc06fabca43da6ef6b00332c3bd1c33bf913eb587d67"
+        },
+        {
+          "path": "src/frontend/templates/header.html",
+          "sha256": "4010e629287c08075a2a8603a82fed6069d8d183c095c4147cc452e221a123ae"
+        },
+        {
+          "path": "src/frontend/templates/home.html",
+          "sha256": "86fc8605a3611f9aa2ab868055462593a63c0ed4172fb412c17d16b80c3b70ab"
+        },
+        {
+          "path": "src/frontend/templates/order.html",
+          "sha256": "c36b7836bc0f2c2edfd40f0c351866225e1da007dbd014a4f64ef16ab8feee0b"
+        },
+        {
+          "path": "src/frontend/templates/product.html",
+          "sha256": "88eec4d3a7aec6806333f064a2ab4c7e55855c2ef6e93ed306a8344a93a18f4b"
+        },
+        {
+          "path": "src/frontend/templates/recommendations.html",
+          "sha256": "e12620918b362c1a8db3c6d85b31005cf7c34c9b301958042e942dc998d3916b"
+        },
+        {
+          "path": "src/frontend/validator/validator.go",
+          "sha256": "d642033b0f742c2477ee9a6dbdadf3b43006f4eecc259152164b6d0f7d8014c1"
+        },
+        {
+          "path": "src/frontend/validator/validator_test.go",
+          "sha256": "fcd04ea0f21cd70947dc9139b5799b9a28ced1d45b3052f2359641e777e1a0a0"
+        }
+      ],
+      "preparation": [],
+      "sourcePath": "src/frontend",
+      "target": null
+    }
+  ],
+  "contractVersion": 1,
+  "planVersion": 1,
+  "platform": "linux/amd64",
+  "repository": "https://github.com/DimitryZH/application-modernization-lab",
+  "sourceRevision": "87c39c498ebf4b7f9b7347f7b317aae27a0630f3",
+  "toolingRevision": "87c39c498ebf4b7f9b7347f7b317aae27a0630f3",
+  "workloadPath": "workloads/online-shop"
+}

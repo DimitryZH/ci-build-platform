@@ -1,0 +1,29 @@
+{
+  "evidenceVersion": 1,
+  "status": "live-acceptance-pending",
+  "date": "2026-10-27",
+  "issue": "https://github.com/DimitryZH/ci-build-platform/issues/1",
+  "sourceRepository": "https://github.com/DimitryZH/application-modernization-lab",
+  "sourceRevision": "87c39c498ebf4b7f9b7347f7b317aae27a0630f3",
+  "components": ["frontend"],
+  "platform": "linux/amd64",
+  "contractSha256": "2a78958157874a90b8ac633def1f337449b7f5c73beaf6e46bde05b388f6995b",
+  "defaultFrontendPlanSha256": "85a8a17518a86bbd0cf3fbf622808b02499660e26f8c756eff4d5235c2ce38f8",
+  "debugFrontendPlanSha256": "1b11f2c56e23658a5f280ac2ed42d3a51a3d48c913afab19eab22c05ba762adb",
+  "offlineValidation": {
+    "producerTests": "7 unittest methods passed, including failure subcases",
+    "realUpstreamPlan": "default and space-containing debug argument plans consumed; all tracked workload bytes verified against pinned Git blobs",
+    "destination": "docker.io/dmitryzhuravlev/online-shop-frontend",
+    "exactMaterialization": "materialize() fetched and checked out the pinned SHA into a new directory; prepare() passed",
+    "workflowLint": "actionlint 1.7.12 passed with repository self-hosted label configuration; shellcheck and pyflakes integrations disabled",
+    "whitespace": "git diff --check passed"
+  },
+  "liveRequest": null,
+  "liveBuild": null,
+  "publication": null,
+  "runnerCleanup": {"status": "not-observed", "reason": "No live runner request dispatched"},
+  "blocker": "workflow_run executes the default-branch workflow. New handoff/build behavior requires normal review and merge before end-to-end validation; no merge or bypass was performed.",
+  "additionalLimitation": "Local gh authentication is invalid; existing infrastructure/secret readiness was not established. Existing deployed runner templates require the normal infrastructure update to adopt startup changes.",
+  "remainingSteps": "Follow docs/online-shop-builds.md Live validation and cleanup, then commit actual sanitized request/plan/results and cleanup observations.",
+  "claims": "Offline implementation evidence only; not a successful publication, release approval or cryptographic provenance."
+}
